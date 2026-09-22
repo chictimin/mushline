@@ -1,15 +1,15 @@
 # mushline
 
-좁은 폭(277px) 사이드바에 상시 띄우는 **병렬 에이전트 모니터링 판**.
-상단은 hcom 메시지 스트림, 하단은 에이전트 상태. 읽기 전용이다.
+A **read-only monitoring board for parallel agents**, meant to stay docked in a narrow (277px) sidebar.
+Top: hcom message stream. Bottom: agent status.
 
 ## Requirements
 
 - Bun ≥ 1.3
-- hcom CLI + `~/.hcom/hcom.db` (현재 유일한 데이터원, hcom-only).
-  hcom 없이 화면만 확인할 경우 아래 Demo(fixtures)를 쓴다.
+- hcom CLI + `~/.hcom/hcom.db` (currently the only data source, hcom-only).
+  Without hcom, use the Demo(fixtures) below for a screen-only check.
 
-## 기동
+## Run
 
 ```
 bun run src/server.ts
@@ -20,43 +20,43 @@ bun run src/server.ts
 ```bash
 sqlite3 /tmp/mushline-fixture.db < fixtures/hcom-min.sql
 bun run src/server.ts --db-path /tmp/mushline-fixture.db
-# 또는 브라우저에서 ?fixture=fixtures/oracle-set.json
+# or in the browser: ?fixture=fixtures/oracle-set.json
 ```
 
-- `http://127.0.0.1:7377` 고정. **포트 자동 탐색을 하지 않는다** — 점유 중이면 즉시 비정상 종료한다.
-- **빌드 없음 · 의존성 0 · 단일 진입점.** `bun install`이 필요해지면 그 자체가 결함이다.
+- `http://127.0.0.1:7377` fixed. **No port auto-discovery** — exits immediately if occupied.
+- **No build · zero dependencies · single entrypoint.** Needing `bun install` is itself a defect.
 
-### 주입 인터페이스 (수용 기준의 전제)
+### Injection interface (precondition for acceptance)
 
-| 이름 | 기본값 | 용도 |
+| Name | Default | Purpose |
 |---|---|---|
-| `--db-path` / `HCOM_DB` | `~/.hcom/hcom.db` | O-4 측정, O-8 ① |
-| `HCOM_BIN` | `hcom` | O-8 ② (CLI 실패 경로 주입) |
+| `--db-path` / `HCOM_DB` | `~/.hcom/hcom.db` | O-4 measurement, O-8 ① |
+| `HCOM_BIN` | `hcom` | O-8 ② (CLI failure-path injection) |
 
-편의 기능이 아니다. 없으면 O-4·O-8이 측정 불가능해진다.
+Not a convenience feature. Without it, O-4·O-8 cannot be measured.
 
-## 문서는 여기 없다
+## Docs live elsewhere
 
-PRD와 경계 스키마의 **정본은 Obsidian vault `Projects/mushline/`이며, 이 저장소에 복제하지 않는다.**
+The canonical PRD and boundary schema live in a private Obsidian vault (`Projects/mushline/`) and are **not duplicated** in this repo.
 
-| 문서 | 역할 |
+| Doc | Role |
 |---|---|
-| `PRD-mushline` | 요구사항(FR-1~21)과 수용 기준(O-1~10), 마일스톤 |
-| `SCHEMA-mushline-boundary` | **W1(서버)과 W2(프론트)의 유일한 접점.** 타입·불변식·소유권·`kind` 매핑표 |
+| `PRD-mushline` | Requirements (FR-1~21), acceptance criteria (O-1~10), milestones |
+| `SCHEMA-mushline-boundary` | **The only contract between W1 (server) and W2 (frontend).** Types, invariants, ownership, `kind` mapping |
 
-스키마를 바꿔야 하면 **vault 문서를 먼저 고친 뒤에만** 코드에 반영한다. 코드가 먼저 나간 변경은 결함이다.
+To change the schema, **edit the vault doc first**, then the code. Code-first changes are defects.
 
-## 파일 소유권
+## File ownership
 
-| 경로 | 소유 | 역할 |
+| Path | Owner | Role |
 |---|---|---|
-| `src/server.ts` | **W1** | 진입점. HTTP·SSE·폴링·버퍼·`/version`·`/term` |
-| `src/ui.html` | **W2** | 화면. 인라인 CSS·JS. 서버가 읽어 서빙한다 |
-| `fixtures/*` | 공용 | 생성은 W1, 소비는 양쪽 |
+| `src/server.ts` | **W1** | Entrypoint. HTTP·SSE·polling·buffer·`/version`·`/term` |
+| `src/ui.html` | **W2** | Screen. Inline CSS·JS, served by the server |
+| `fixtures/*` | shared | Created by W1, consumed by both |
 
-상대 파일은 편집하지 않는다. 고쳐야 한다고 판단되면 **vault 문서의 변경을 요청**한다.
+Do not edit the other owner's file. If it needs changing, **request a vault doc change**.
 
-## hcom DB는 읽기 전용이다
+## The hcom DB is read-only
 
-`~/.hcom/hcom.db`에 **절대 쓰지 않는다.** 테스트 주입도 실 DB가 아니라 사본에 한다 (`fixtures/hcom-min.sql`).
-hcom DB 손상은 전 세션을 잃는 사고다.
+**Never write to** `~/.hcom/hcom.db`. Test injection goes to a copy, not the live DB (`fixtures/hcom-min.sql`).
+Corrupting the hcom DB loses every session.
