@@ -1,0 +1,313 @@
+{
+  "v": 1,
+  "snapshot": {
+    "v": 1,
+    "ts": "2026-09-22T11:56:00.000Z",
+    "agents": [
+      {
+        "name": "zinu",
+        "tag": null,
+        "tool": "opencode",
+        "status": "active",
+        "statusContext": "tool:Bash",
+        "statusDetail": "bun run src/server.ts",
+        "description": "Orchestrator. Wiring up releases.",
+        "directory": "/Users/x/demo/mushline",
+        "unreadCount": 3,
+        "lastEventAt": "2026-09-22T11:55:41.000Z"
+      },
+      {
+        "name": "magi",
+        "tag": "uimig",
+        "tool": "opencode",
+        "status": "active",
+        "statusContext": "tool:Edit",
+        "statusDetail": "/Users/x/demo/mushline/src/ui.html",
+        "description": "UI migration lane.",
+        "directory": "/Users/x/demo/mushline",
+        "unreadCount": 0,
+        "lastEventAt": "2026-09-22T11:55:10.000Z"
+      },
+      {
+        "name": "bulo",
+        "tag": null,
+        "tool": "claude",
+        "status": "blocked",
+        "statusContext": "approval",
+        "statusDetail": "Bash: git push --force origin main",
+        "description": "Docs lane. Waiting on push approval.",
+        "directory": "/Users/x/demo/mushline",
+        "unreadCount": 1,
+        "lastEventAt": "2026-09-22T11:52:48.000Z"
+      },
+      {
+        "name": "sona",
+        "tag": null,
+        "tool": "codex",
+        "status": "listening",
+        "statusContext": "ready_observed",
+        "statusDetail": "",
+        "description": "Audit lane. Verdicts only, no fixes.",
+        "directory": "/Users/x/demo/mushline",
+        "unreadCount": 0,
+        "lastEventAt": "2026-09-22T11:40:03.000Z"
+      },
+      {
+        "name": "rive",
+        "tag": "bench",
+        "tool": "gemini",
+        "status": "inactive",
+        "statusContext": null,
+        "statusDetail": null,
+        "description": "Bench lane. Nightly load probe.",
+        "directory": "/Users/x/demo/bench",
+        "unreadCount": 0,
+        "lastEventAt": "2026-09-21T22:14:00.000Z"
+      }
+    ]
+  },
+  "activities": [
+    {
+      "v": 1,
+      "id": "demo-1",
+      "ts": "2026-09-22T11:44:01.000Z",
+      "agent": "rive",
+      "kind": "life",
+      "label": "exit",
+      "detail": null
+    },
+    {
+      "v": 1,
+      "id": "demo-2",
+      "ts": "2026-09-22T11:46:12.000Z",
+      "agent": "sona",
+      "kind": "life",
+      "label": "ready",
+      "detail": null
+    },
+    {
+      "v": 1,
+      "id": "demo-3",
+      "ts": "2026-09-22T11:48:01.000Z",
+      "agent": "zinu",
+      "kind": "cmd",
+      "label": "Bash",
+      "detail": "bun run src/server.ts"
+    },
+    {
+      "v": 1,
+      "id": "demo-4",
+      "ts": "2026-09-22T11:49:33.000Z",
+      "agent": "magi",
+      "kind": "file",
+      "label": "Read",
+      "detail": "/Users/x/demo/mushline/src/server.ts"
+    },
+    {
+      "v": 1,
+      "id": "demo-5",
+      "ts": "2026-09-22T11:50:22.000Z",
+      "agent": "magi",
+      "kind": "file",
+      "label": "Edit",
+      "detail": "/Users/x/demo/mushline/src/ui.html"
+    },
+    {
+      "v": 1,
+      "id": "demo-6",
+      "ts": "2026-09-22T11:51:09.000Z",
+      "agent": "zinu",
+      "kind": "tool",
+      "label": "Bash",
+      "detail": "git push origin main"
+    },
+    {
+      "v": 1,
+      "id": "demo-7",
+      "ts": "2026-09-22T11:52:48.000Z",
+      "agent": "bulo",
+      "kind": "msg",
+      "label": "request",
+      "detail": "Approval needed for force-push"
+    },
+    {
+      "v": 1,
+      "id": "demo-8",
+      "ts": "2026-09-22T11:53:40.000Z",
+      "agent": "sona",
+      "kind": "cmd",
+      "label": "Bash",
+      "detail": "rg -n 'TODO|FIXME' src/ fixtures/"
+    },
+    {
+      "v": 1,
+      "id": "demo-9",
+      "ts": "2026-09-22T11:54:41.000Z",
+      "agent": "zinu",
+      "kind": "msg",
+      "label": "inform",
+      "detail": "Release published"
+    },
+    {
+      "v": 1,
+      "id": "demo-10",
+      "ts": "2026-09-22T11:55:10.000Z",
+      "agent": "magi",
+      "kind": "file",
+      "label": "Edit",
+      "detail": "/Users/x/demo/mushline/fixtures/demo-live.json"
+    }
+  ],
+  "messages": [
+    {
+      "v": 1,
+      "id": "demo-m1",
+      "ts": "2026-09-22T11:45:02.000Z",
+      "from": "sona",
+      "to": [],
+      "intent": "inform",
+      "thread": null,
+      "text": "Nightly bench finished. No anomalies worth paging for."
+    },
+    {
+      "v": 1,
+      "id": "demo-m2",
+      "ts": "2026-09-22T11:46:30.000Z",
+      "from": "zinu",
+      "to": ["magi"],
+      "intent": "request",
+      "thread": null,
+      "text": "Migrate the sidebar to the new 277px layout when you land."
+    },
+    {
+      "v": 1,
+      "id": "demo-m3",
+      "ts": "2026-09-22T11:47:11.000Z",
+      "from": "magi",
+      "to": ["zinu"],
+      "intent": "ack",
+      "thread": null,
+      "text": "On it. Reading server.ts first so I don't break the contract."
+    },
+    {
+      "v": 1,
+      "id": "demo-m4",
+      "ts": "2026-09-22T11:48:55.000Z",
+      "from": "zinu",
+      "to": ["sona"],
+      "intent": "request",
+      "thread": null,
+      "text": "Can you sweep src/ for leftover TODOs before the release?"
+    },
+    {
+      "v": 1,
+      "id": "demo-m5",
+      "ts": "2026-09-22T11:49:20.000Z",
+      "from": "sona",
+      "to": ["zinu"],
+      "intent": "ack",
+      "thread": null,
+      "text": "Sweeping now. Verdicts only, no fixes — per the lane rule."
+    },
+    {
+      "v": 1,
+      "id": "demo-m6",
+      "ts": "2026-09-22T11:50:03.000Z",
+      "from": "magi",
+      "to": ["zinu", "sona"],
+      "intent": "inform",
+      "thread": null,
+      "text": "Sidebar migration touches ui.html only. No contract change, so no waiver needed. Full reasoning: the SCHEMA owns types and invariants, and I am not adding fields, renaming keys, or changing the snapshot shape. Same payload, narrower CSS. If the auditor disagrees I will file the waiver retroactively, but per the effect rule this is exempt."
+    },
+    {
+      "v": 1,
+      "id": "demo-m7",
+      "ts": "2026-09-22T11:51:37.000Z",
+      "from": "sona",
+      "to": ["zinu"],
+      "intent": "inform",
+      "thread": null,
+      "text": "Sweep done. Two TODOs, both in comments, both pre-existing. No action."
+    },
+    {
+      "v": 1,
+      "id": "demo-m8",
+      "ts": "2026-09-22T11:52:48.000Z",
+      "from": "bulo",
+      "to": ["zinu"],
+      "intent": "request",
+      "thread": null,
+      "text": "Force-push needs approval before I proceed."
+    },
+    {
+      "v": 1,
+      "id": "demo-m9",
+      "ts": "2026-09-22T11:53:05.000Z",
+      "from": "zinu",
+      "to": ["bulo"],
+      "intent": "ack",
+      "thread": "demo-m8",
+      "text": "Approved. Fresh repo, no external users yet."
+    },
+    {
+      "v": 1,
+      "id": "demo-m10",
+      "ts": "2026-09-22T11:53:44.000Z",
+      "from": "bulo",
+      "to": ["zinu"],
+      "intent": "inform",
+      "thread": "demo-m8",
+      "text": "Pushed. Contributors graph may lag up to a day, watching it."
+    },
+    {
+      "v": 1,
+      "id": "demo-m11",
+      "ts": "2026-09-22T11:54:12.000Z",
+      "from": "zinu",
+      "to": [],
+      "intent": "inform",
+      "thread": null,
+      "text": "Release is live."
+    },
+    {
+      "v": 1,
+      "id": "demo-m12",
+      "ts": "2026-09-22T11:54:41.000Z",
+      "from": "magi",
+      "to": ["zinu"],
+      "intent": "request",
+      "thread": null,
+      "text": "Sidebar done. Need eyes on the stale banner timing before screenshots."
+    },
+    {
+      "v": 1,
+      "id": "demo-m13",
+      "ts": "2026-09-22T11:55:02.000Z",
+      "from": "zinu",
+      "to": ["magi"],
+      "intent": "ack",
+      "thread": null,
+      "text": "Looking now."
+    },
+    {
+      "v": 1,
+      "id": "demo-m14",
+      "ts": "2026-09-22T11:55:20.000Z",
+      "from": "sona",
+      "to": [],
+      "intent": "inform",
+      "thread": null,
+      "text": "Screenshot fixture drafted. Five agents, mixed statuses, one blocked."
+    },
+    {
+      "v": 1,
+      "id": "demo-m15",
+      "ts": "2026-09-22T11:55:41.000Z",
+      "from": "zinu",
+      "to": [],
+      "intent": "inform",
+      "thread": null,
+      "text": "Fixture extended. Scroll check next."
+    }
+  ]
+}
