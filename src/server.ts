@@ -49,6 +49,7 @@ type Kind = "tool" | "file" | "cmd" | "life" | "status" | "other";
 interface Agent {
   name: string;
   tag: string | null;
+  tool: string | null; // hcom tool 원문. 없으면 null (SCHEMA §2, UI 배치 #5)
   status: AgentStatus;
   statusContext: string | null;
   statusDetail: string | null;
@@ -397,6 +398,7 @@ function agentsFromCli(raw: unknown[]): Agent[] {
     return {
       name,
       tag: nullable(a.tag),
+      tool: nullable(a.tool),
       status: normStatus(a.status),
       statusContext: nullable(a.status_context),
       statusDetail: nullable(a.status_detail),
@@ -411,13 +413,14 @@ function agentsFromCli(raw: unknown[]): Agent[] {
 function agentsFromDb(): Agent[] {
   if (!db) return [];
   const rows = db
-    .query("SELECT name, tag, status, status_context, status_detail, directory FROM instances")
+    .query("SELECT name, tag, tool, status, status_context, status_detail, directory FROM instances")
     .all() as Array<Record<string, unknown>>;
   return rows.map((r) => {
     const name = String(r.name ?? "");
     return {
       name,
       tag: nullable(r.tag),
+      tool: nullable(r.tool),
       status: normStatus(r.status),
       statusContext: nullable(r.status_context),
       statusDetail: nullable(r.status_detail),

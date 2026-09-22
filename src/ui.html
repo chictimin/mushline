@@ -135,6 +135,20 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .agent .who {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    min-width: 0;
+  }
+  .agent .tool {
+    flex: none;
+    font-size: 13px;
+    border: 1px solid #555;
+    color: #ccc;
+    padding: 0 4px;
+    white-space: nowrap;
+  }
   .agent .st {
     flex: none;
     font-weight: normal;
@@ -297,6 +311,18 @@
     return "?";
   }
 
+  /* UI 배치 #5: tool 약자 매핑. claude→CC, opencode→OC, codex→CX,
+     그 외 원문 앞 2자 대문자. null/""이면 뱃지 없음. 모델명은 표시하지 않는다. */
+  function toolAbbr(tool) {
+    if (tool === null || tool === undefined || tool === "") return null;
+    var t = String(tool);
+    var low = t.toLowerCase();
+    if (low === "claude") return "CC";
+    if (low === "opencode") return "OC";
+    if (low === "codex") return "CX";
+    return t.slice(0, 2).toUpperCase();
+  }
+
   /* --- 배너 --- */
 
   /* SCHEMA §3-10: ok=false 배너는 ok=true까지 유지. 정상 snapshot이 와도 내리지 않는다. */
@@ -387,10 +413,21 @@
       head.className = "head";
       var displayName = (a.tag !== null && a.tag !== undefined && a.tag !== "")
         ? a.tag + "/" + a.name : esc(a.name);
+      var who = document.createElement("span");
+      who.className = "who";
+      var abbr = toolAbbr(a.tool);
+      if (abbr !== null) {
+        var badge = document.createElement("span");
+        badge.className = "tool";
+        badge.setAttribute("data-tool", esc(a.tool));
+        badge.textContent = abbr;
+        who.appendChild(badge);
+      }
       var aname = document.createElement("span");
       aname.className = "aname";
       aname.textContent = displayName;
-      head.appendChild(aname);
+      who.appendChild(aname);
+      head.appendChild(who);
       var st = document.createElement("span");
       st.className = "st st-" + esc(a.status);
       st.textContent = statusGlyph(a.status) + " " + esc(a.status);
