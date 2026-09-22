@@ -285,6 +285,7 @@
   var HISTORY_N = 3;
   /* UI 배치 #3: 인라인 스타일·매직넘버 금지. 값 변경은 이 상수만 고친다. */
   var HIST_DEFAULT_N = 2;         /* FR-11: 기본 노출 최신 2건 */
+  var MODAL_HISTORY_MAX = 20;     /* FR-11 개정: 모달 최대 20건 */
   var AGENT_TALL_MIN_N = 5;       /* FR-15: 5명 이상일 때만 하단 스크롤 */
   var AGENT_TALL_CLASS = "tall";  /* FR-15: #agentList max-height 토글 클래스 */
   var BUFFER_MAX = 200;
@@ -351,6 +352,20 @@
   }
 
   function esc(text) { return text === null || text === undefined ? "" : String(text); }
+
+  /* UI 배치2-1: 메시지 본문의 연속 공백 줄을 접는다. 공백만 있는 줄의 연속은
+     최대 1줄로 줄이고 앞쪽 빈 줄은 버려 빈 줄이 자리를 차지하지 않게 한다.
+     헤더·접기/펼치기 버튼은 건드리지 않는다. */
+  function foldBlankLines(s) {
+    var lines = String(s).split("\n");
+    var out = [];
+    for (var i = 0; i < lines.length; i++) {
+      if (lines[i].trim() !== "") { out.push(lines[i]); continue; }
+      var prev = out.length > 0 ? out[out.length - 1] : null;
+      if (prev !== null && prev.trim() !== "") out.push("");
+    }
+    return out.join("\n");
+  }
 
   function statusGlyph(status) {
     if (status === "active") return "\u25B6";    /* ▶ */
@@ -497,13 +512,6 @@
       cur.textContent = combineLine(a.statusContext, a.statusDetail);
       wrap.appendChild(cur);
 
-      var t = document.createElement("div");
-      t.className = "desc";
-      t.textContent = fmtTime(a.lastEventAt);
-      wrap.appendChild(t);
-
-      /* FR-11: 기본 노출 최신 HIST_DEFAULT_N=2건. 전체(N=HISTORY_N=3까지)는
-         해당 영역 클릭 시 모달로 본다. 인라인 펼치기 버튼을 두지 않는다. */
       var hists = historyFor(a.name);
       if (hists.length > 0) {
         (function (nm, hs) {
@@ -581,12 +589,22 @@
     if (state.view === "time") renderTime();
   }
 
-  /* FR-11 모달: N=HISTORY_N=3 고정. historyFor가 이미 상한을 건다. */
+  /* FR-11 개정: 모달은 최대 MODAL_HISTORY_MAX=20건. 기본 2건(historyFor)과
+     별도 경로다. 보관량: 에이전트 7명×20건=140 ≤ BUFFER_MAX=200이라
+     버퍼 증량 없이 전원 20건을 담는다. */
+  function modalHistories(name) {
+    var out = [];
+    for (var i = state.activities.length - 1; i >= 0; i--) {
+      if (state.activities[i].agent === name) out.push(state.activities[i]);
+    }
+    return out.slice(0, MODAL_HISTORY_MAX);
+  }
+  /* FR-11 모달: N 상한은 MODAL_HISTORY_MAX가 건다. */
   var histModal = $("histModal"), histTitle = $("histTitle"),
       histBody = $("histBody"), histClose = $("histClose");
   function openHistModal(name) {
-    var hs = historyFor(name);
-    histTitle.textContent = name + " 이력 " + hs.length + "/" + HISTORY_N;
+    var hs = modalHistories(name);
+    histTitle.textContent = name + " 이력 " + hs.length + "/" + MODAL_HISTORY_MAX;
     histBody.textContent = "";
     hs.forEach(function (h) {
       var row = document.createElement("div");
@@ -633,7 +651,7 @@
     meta.textContent = "● " + m.from + to + intent + "  " + fmtTime(m.ts);
     var text = document.createElement("div");
     text.className = "text";
-    text.textContent = esc(m.text);
+    text.textContent = foldBlankLines(esc(m.text));
     wrap.appendChild(meta);
     wrap.appendChild(text);
     msgList.appendChild(wrap);
