@@ -65,6 +65,17 @@
     height: 1px;
     background: #555;
   }
+  #topTabs {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 3px 6px;
+    font-size: 10px;
+    color: #aaa;
+    border-bottom: 1px solid #333;
+    min-width: 0;
+    flex: 0 0 auto;
+  }
   #agentPane { flex: 0 0 auto; min-width: 0; }
   #agentHeader {
     display: flex;
@@ -172,19 +183,21 @@
 <div id="staleBanner" class="banner" hidden></div>
 <div id="vBanner" class="banner" hidden></div>
 <main id="layout">
-  <section id="msgPane" aria-label="hcom message stream">
+  <header id="topTabs" aria-label="top view tabs">
+    <span id="viewToggle">
+      <button id="tabLog" data-view="log" aria-pressed="true">로그</button><button id="tabTime" data-view="time" aria-pressed="false">시간순</button>
+    </span>
+  </header>
+  <section id="msgPane" aria-label="top views">
     <div id="msgList"></div>
+    <div id="timeList" hidden></div>
   </section>
   <div id="divider"></div>
   <section id="agentPane" aria-label="agents">
     <header id="agentHeader">
       <span>에이전트</span>
-      <span id="viewToggle">
-        <button id="viewAgents" data-view="agents" aria-pressed="true">별</button><button id="viewTime" data-view="time" aria-pressed="false">시간순</button>
-      </span>
     </header>
     <div id="agentList"></div>
-    <div id="timeList" hidden></div>
   </section>
 </main>
 <script>
@@ -199,17 +212,19 @@
   var HISTORY_N = 3;
   var BUFFER_MAX = 200;
   var HEARTBEAT_STALE_MS = 30000;
+  /* FR-10: 상단 탭 선택 영속. 기존 하단 토글 키(mushline.view)를 재사용한다.
+     값은 상단 탭에 맞게 log/time. 구 값 agents는 log로 이행한다. */
   var VIEW_KEY = "mushline.view";
 
   var $ = function (id) { return document.getElementById(id); };
   var msgList = $("msgList"), agentList = $("agentList"), timeList = $("timeList");
   var connBanner = $("connBanner"), staleBanner = $("staleBanner"), vBanner = $("vBanner");
-  var viewAgentsBtn = $("viewAgents"), viewTimeBtn = $("viewTime");
+  var tabLogBtn = $("tabLog"), tabTimeBtn = $("tabTime");
 
   var state = {
     agents: [],
     activities: [],   /* 오래된 순. DOM·이력의 원본 */
-    view: "agents",
+    view: "log",
     healthOk: true,
     healthSource: null,
     healthReason: null,
@@ -225,7 +240,8 @@
 
   try {
     var saved = window.localStorage.getItem(VIEW_KEY);
-    if (saved === "agents" || saved === "time") state.view = saved;
+    if (saved === "log" || saved === "time") state.view = saved;
+    else if (saved === "agents") state.view = "log";
   } catch (e) { /* localStorage 불가 환경에서는 기본 뷰 */ }
 
   function pad(n) { return (n < 10 ? "0" : "") + n; }
@@ -427,27 +443,30 @@
       row.appendChild(document.createTextNode(activityLine(a)));
       timeList.appendChild(row);
     });
-    timeList.style.maxHeight = state.agents.length >= 5 ? "55vh" : "";
+    /* 상단 영역은 #msgPane 스크롤에 맡긴다. 하단 FR-15 max-height와 무관. */
+    timeList.style.maxHeight = "";
   }
 
+  /* FR-10: 상단은 로그/시간순 탭, 하단은 에이전트별 뷰 고정. */
   function applyView() {
-    var isAgents = state.view === "agents";
-    agentList.hidden = !isAgents;
-    timeList.hidden = isAgents;
-    viewAgentsBtn.setAttribute("aria-pressed", isAgents ? "true" : "false");
-    viewTimeBtn.setAttribute("aria-pressed", isAgents ? "false" : "true");
-    if (isAgents) renderAgents();
-    else renderTime();
+    var isLog = state.view === "log";
+    msgList.hidden = !isLog;
+    timeList.hidden = isLog;
+    tabLogBtn.setAttribute("aria-pressed", isLog ? "true" : "false");
+    tabTimeBtn.setAttribute("aria-pressed", isLog ? "false" : "true");
+    renderAgents();
+    if (!isLog) renderTime();
   }
 
   function setView(v) {
+    if (v !== "log" && v !== "time") return;
     state.view = v;
     try { window.localStorage.setItem(VIEW_KEY, v); } catch (e) { /* 무시 */ }
     applyView();
   }
 
-  viewAgentsBtn.addEventListener("click", function () { setView("agents"); });
-  viewTimeBtn.addEventListener("click", function () { setView("time"); });
+  tabLogBtn.addEventListener("click", function () { setView("log"); });
+  tabTimeBtn.addEventListener("click", function () { setView("time"); });
 
   /* 메시지: 최신이 아래, 자동 스크롤(맨 아래 근처일 때만 따라감). */
   var msgPane = $("msgPane");
@@ -542,7 +561,7 @@
     } else {
       state.expandedTerm[name] = true;
     }
-    if (state.view === "agents") renderAgents();
+    renderAgents();
   }
 
   function loadTerm(name, node) {
