@@ -7,3 +7,8 @@ measurements/
 *.db
 *.db-wal
 *.db-shm
+
+# 선정자 산출물 — oracle을 구현 워커에 착수 시점 미전달 (PRD §0 한계 1, §11)
+# roster.yaml의 committed:true를 캡틴 판단으로 뒤집은 것이다.
+# 대가로 백업이 없으므로 M1 마감 시 vault Projects/mushline/_roster/ 로 복사한다.
+.roster/
