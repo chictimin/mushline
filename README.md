@@ -1,12 +1,26 @@
 # mushline
 
-cmux 우측 사이드바 dock(폭 277px)에 상시 띄우는 **병렬 에이전트 모니터링 판**.
+좁은 폭(277px) 사이드바에 상시 띄우는 **병렬 에이전트 모니터링 판**.
 상단은 hcom 메시지 스트림, 하단은 에이전트 상태. 읽기 전용이다.
+
+## Requirements
+
+- Bun ≥ 1.3
+- hcom CLI + `~/.hcom/hcom.db` (현재 유일한 데이터원, hcom-only).
+  hcom 없이 화면만 확인할 경우 아래 Demo(fixtures)를 쓴다.
 
 ## 기동
 
 ```
 bun run src/server.ts
+```
+
+### Demo without hcom (fixtures)
+
+```bash
+sqlite3 /tmp/mushline-fixture.db < fixtures/hcom-min.sql
+bun run src/server.ts --db-path /tmp/mushline-fixture.db
+# 또는 브라우저에서 ?fixture=fixtures/oracle-set.json
 ```
 
 - `http://127.0.0.1:7377` 고정. **포트 자동 탐색을 하지 않는다** — 점유 중이면 즉시 비정상 종료한다.

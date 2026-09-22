@@ -10,7 +10,7 @@
         "statusContext": "tool:Bash",
         "statusDetail": "bun run src/server.ts --db-path /tmp/mushline-fixture.db --db-path /tmp/mushline-fixture.db --hcom-bin /usr/local/bin/hcom --retry 3 --verbose 2>&1 | tee /tmp/mushline-measure/run-oracle-set-$(date +%Y%m%dT%H%M%S).log --db-path /tmp/mushline-fixture.db --hcom-bin /usr/local/bin/hcom --retry 3 --verbose 2>&1 | tee /tmp/mushline-measure/run-oracle-set-$(date +%Y%m%dT%H%M%S).log --db-path /tmp/mushline-fixture.db --hcom-bin /usr/local/bin/hcom --retry 3 --verbose 2>&1 | tee /tmp/mushline-measure/ru",
         "description": "서버·SSE·폴링 담당. hcom DB를 읽기 전용으로 열고 events_v를 200ms 폴링한다 · 병렬 에이전트 모니터링 판 mushline",
-        "directory": "/Users/mjolnir/Desktop/code/mushline-w1",
+        "directory": "/Users/x/mushline-w1",
         "unreadCount": 0,
         "lastEventAt": "2026-09-22T06:29:58.000Z"
       },
@@ -18,9 +18,9 @@
         "name": "nova",
         "status": "active",
         "statusContext": "tool:Edit",
-        "statusDetail": "/Users/mjolnir/Desktop/code/mushline-w2/src/ui.html --db-path /tmp/mushline-fixture.db --hcom-bin /usr/local/bin/hcom --retry 3 --verbose 2>&1 | tee /tmp/mushline-measure/run-oracle-set-$(date +%Y%m%dT%H%M%S).log --db-path /tmp/mushline-fixture.db --hcom-bin /usr/local/bin/hcom --retry 3 --verbose 2>&1 | tee /tmp/mushline-measure/run-oracle-set-$(date +%Y%m%dT%H%M%S).log --db-path /tmp/mushline-fixture.db --hcom-bin /usr/local/bin/hcom --retry 3 --verbose 2>&1 | tee /tmp/mushline-measure/run-ora",
+        "statusDetail": "/Users/x/mushline-w2/src/ui.html --db-path /tmp/mushline-fixture.db --hcom-bin /usr/local/bin/hcom --retry 3 --verbose 2>&1 | tee /tmp/mushline-measure/run-oracle-set-$(date +%Y%m%dT%H%M%S).log --db-path /tmp/mushline-fixture.db --hcom-bin /usr/local/bin/hcom --retry 3 --verbose 2>&1 | tee /tmp/mushline-measure/run-oracle-set-$(date +%Y%m%dT%H%M%S).log --db-path /tmp/mushline-fixture.db --hcom-bin /usr/local/bin/hcom --retry 3 --verbose 2>&1 | tee /tmp/mushline-measure/run-ora",
         "description": "프론트 렌더 담당. 277px 레이아웃·말줄임·정렬·sticky·stale 배너를 만든다 · 병렬 에이전트 모니터링 판 mushline의 더블체",
-        "directory": "/Users/mjolnir/Desktop/code/mushline-w2",
+        "directory": "/Users/x/mushline-w2",
         "unreadCount": 3,
         "lastEventAt": "2026-09-22T06:29:51.000Z"
       },
@@ -72,7 +72,7 @@
       "agent": "lune",
       "kind": "file",
       "label": "Edit",
-      "detail": "/Users/mjolnir/Desktop/code/mushline-w1/src/server.ts"
+      "detail": "/Users/x/mushline-w1/src/server.ts"
     },
     {
       "v": 1,
@@ -117,7 +117,7 @@
       "agent": "nova",
       "kind": "file",
       "label": "Write",
-      "detail": "/Users/mjolnir/Desktop/code/mushline-w1/src/ui.html"
+      "detail": "/Users/x/mushline-w1/src/ui.html"
     },
     {
       "v": 1,
@@ -162,7 +162,7 @@
       "agent": "sona",
       "kind": "file",
       "label": "write",
-      "detail": "/Users/mjolnir/Desktop/code/mushline-w1/src/notes.md"
+      "detail": "/Users/x/mushline-w1/src/notes.md"
     },
     {
       "v": 1,
@@ -207,7 +207,7 @@
       "agent": "miro",
       "kind": "file",
       "label": "NotebookEdit",
-      "detail": "/Users/mjolnir/Desktop/code/mushline-w1/src/probe.ipynb"
+      "detail": "/Users/x/mushline-w1/src/probe.ipynb"
     },
     {
       "v": 1,

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -448,8 +448,8 @@
 <div id="vBanner" class="banner" hidden></div>
 <main id="layout">
   <header id="topTabs" aria-label="top view tabs">
-    <span id="viewToggle" role="tablist" aria-label="상단 보기 전환">
-      <button id="tabLog" data-view="log" aria-pressed="true" role="tab"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M2 4h12M2 8h12M2 12h7"/></svg>로그</button><button id="tabTime" data-view="time" aria-pressed="false" role="tab"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 1.5"/></svg>시간순</button>
+    <span id="viewToggle" role="tablist" aria-label="Switch top view">
+      <button id="tabLog" data-view="log" aria-pressed="true" role="tab"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M2 4h12M2 8h12M2 12h7"/></svg>Log</button><button id="tabTime" data-view="time" aria-pressed="false" role="tab"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 1.5"/></svg>Timeline</button>
     </span>
   </header>
   <section id="msgPane" aria-label="top views">
@@ -459,14 +459,14 @@
   <div id="divider"></div>
   <section id="agentPane" aria-label="agents">
     <header id="agentHeader">
-      <span class="title">에이전트</span><span class="count" id="agentCount"></span>
+      <span class="title">Agents</span><span class="count" id="agentCount"></span>
     </header>
     <div id="agentList"></div>
   </section>
 </main>
 <div id="histModal" hidden>
-  <div id="histDlg" role="dialog" aria-modal="true" aria-label="이력 전체">
-    <div class="mhead"><span id="histTitle"></span><button id="histClose" aria-label="닫기"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
+  <div id="histDlg" role="dialog" aria-modal="true" aria-label="Full history">
+    <div class="mhead"><span id="histTitle"></span><button id="histClose" aria-label="Close"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
     <div id="histBody"></div>
   </div>
 </div>
@@ -597,7 +597,7 @@
     if (!state.healthOk) {
       text = "STALE — " + esc(state.healthSource) + ": " + esc(state.healthReason);
     } else if (hbStale) {
-      text = "STALE — heartbeat 30초 없음";
+      text = "STALE — no heartbeat for 30s";
     }
     if (text === state.lastBannerText) return;
     state.lastBannerText = text;
@@ -624,14 +624,14 @@
   function checkVersion(ev) {
     if (ev === null || ev === undefined || typeof ev.v !== "number") {
       state.vDropped += 1;
-      vBanner.textContent = "버전 경고 — v 없음, 이벤트 " + state.vDropped + "건 버림";
+      vBanner.textContent = "Version warning — no v, dropped " + state.vDropped + " events";
       vBanner.hidden = false;
       return false;
     }
     if (ev.v < minClientV) {
       state.vDropped += 1;
-      vBanner.textContent = "버전 경고 — v=" + ev.v + " < minClientV=" + minClientV +
-        ", 이벤트 " + state.vDropped + "건 버림";
+      vBanner.textContent = "Version warning — v=" + ev.v + " < minClientV=" + minClientV +
+        ", dropped " + state.vDropped + " events";
       vBanner.hidden = false;
       return false;
     }
@@ -667,7 +667,7 @@
   function renderAgents() {
     agentList.textContent = "";
     var list = sortedAgents();
-    agentCount.textContent = list.length + "명";
+    agentCount.textContent = list.length + " agents";
     list.forEach(function (a) {
       var wrap = document.createElement("div");
       wrap.className = "agent" + (a.status === "blocked" ? " blocked" : "");
@@ -735,8 +735,8 @@
           }
           var moreBtn = document.createElement("button");
           moreBtn.className = "hexpand";
-          moreBtn.setAttribute("aria-label", nm + " 이력 전체 보기");
-          moreBtn.title = nm + " 이력 전체 보기";
+          moreBtn.setAttribute("aria-label", nm + " view full history");
+          moreBtn.title = nm + " view full history";
           moreBtn.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h5v5M14 2L9 7M7 14H2V9M2 14l5-5"/></svg>';
           moreBtn.addEventListener("click", function () { openHistModal(nm); });
           hw.appendChild(moreBtn);
@@ -811,12 +811,12 @@
       histBody = $("histBody"), histClose = $("histClose");
   function openHistModal(name) {
     var hs = modalHistories(name);
-    histTitle.textContent = name + " 이력 " + hs.length + "/" + MODAL_HISTORY_MAX;
+    histTitle.textContent = name + " history " + hs.length + "/" + MODAL_HISTORY_MAX;
     histBody.textContent = "";
     if (hs.length === 0) {
       var p = document.createElement("div");
       p.className = "mrow";
-      p.textContent = "이력이 없습니다";
+      p.textContent = "No history";
       histBody.appendChild(p);
     }
     hs.forEach(function (h) {
@@ -860,7 +860,7 @@
     wrap.className = "msg";
     var meta = document.createElement("div");
     meta.className = "meta";
-    var to = (m.to && m.to.length) ? " → @" + m.to.join(",@") : " → (전체)";
+    var to = (m.to && m.to.length) ? " → @" + m.to.join(",@") : " → (all)";
     var from = document.createTextNode("● " + m.from + to + "  ");
     meta.appendChild(from);
     if (m.intent) {
@@ -891,7 +891,7 @@
       meta.setAttribute("role", "button");
       meta.setAttribute("tabindex", "0");
       meta.setAttribute("aria-expanded", "false");
-      meta.title = "눌러서 펼치기/접기";
+      meta.title = "Click to expand/collapse";
       meta.addEventListener("click", function () {
         var on = wrap.classList.toggle("expanded");
         meta.setAttribute("aria-expanded", on ? "true" : "false");
@@ -992,7 +992,7 @@
       .catch(function () { /* 버전 조회 실패는 오프라인 폴백에서 처리 */ })
       .then(function () {
         if (forceSample) {
-          loadSample("예시 모드 (?sample=1)");
+          loadSample("Sample mode (?sample=1)");
           return;
         }
         if (fixturePath) {
@@ -1000,7 +1000,7 @@
           return;
         }
         if (typeof window.EventSource === "undefined") {
-          loadSample("EventSource 없음 — 예시 표시");
+          loadSample("No EventSource — showing sample");
           return;
         }
         connect();
@@ -1015,7 +1015,7 @@
     try {
       es = new window.EventSource("/events");
     } catch (e) {
-      loadSample("연결 실패 — 예시 표시");
+      loadSample("Connection failed — showing sample");
       return;
     }
     var gotSnapshot = false;
@@ -1055,9 +1055,9 @@
       /* EventSource는 자동 재시도한다. 첫 snapshot 전 실패면 예시로 기립한다
          (SCHEMA §5: 실서버 없이 화면이 떠야 한다). */
       if (!gotSnapshot && !state.everConnected) {
-        loadSample("서버 없음 — 예시 표시 (OFFLINE)");
+        loadSample("No server — showing sample (OFFLINE)");
       } else {
-        setConn("연결 끊김 — 재연결 중…");
+        setConn("Disconnected — reconnecting…");
       }
     };
     /* failTimer를 쓰지 않는다: setTimeout도 백그라운드 스로틀 대상이며,
@@ -1076,13 +1076,13 @@
         v: 1, ts: iso,
         agents: [
           { name: "lune", tag: "w1", status: "active", statusContext: "tool:Bash",
-            statusDetail: "bun run src/server.ts", description: "서버·SSE 담당",
+            statusDetail: "bun run src/server.ts", description: "Server/SSE",
             directory: "/Users/x/mushline", unreadCount: 0, lastEventAt: iso },
           { name: "nova", tag: null, status: "blocked", statusContext: "approval",
-            statusDetail: "Bash", description: "프론트 렌더 담당",
+            statusDetail: "Bash", description: "Frontend rendering",
             directory: "/Users/x/mushline", unreadCount: 0, lastEventAt: iso },
           { name: "sona", tag: null, status: "listening", statusContext: null,
-            statusDetail: null, description: "문서 정리 담당",
+            statusDetail: null, description: "Docs",
             directory: "/Users/x/mushline", unreadCount: 0, lastEventAt: old }
         ]
       },
@@ -1094,9 +1094,9 @@
       ],
       messages: [
         { v: 1, id: "sample-m1", ts: iso, from: "lune", to: ["nova"],
-          intent: "request", thread: null, text: "경계 스키마 v1 올렸음" },
+          intent: "request", thread: null, text: "Boundary schema v1 pushed" },
         { v: 1, id: "sample-m2", ts: iso, from: "nova", to: ["lune"],
-          intent: "ack", thread: null, text: "받음. 렌더 붙인다" }
+          intent: "ack", thread: null, text: "Got it. Wiring up render" }
       ]
     };
   }
@@ -1123,7 +1123,7 @@
         msgs.forEach(onMessage);
       })
       .catch(function () {
-        loadSample("fixture 실패 — 예시 표시 (OFFLINE)");
+        loadSample("Fixture failed — showing sample (OFFLINE)");
       });
   }
 
