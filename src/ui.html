@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=277, initial-scale=1">
+<title>mushline</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 277px;
+    max-width: 277px;
+    /* NOTE(O-1): 조상 전수에 overflow-x:hidden 금지. 잘림 은폐가 아니라
+       셀 ellipsis + 줄바꿈으로 폭을 맞춘다. */
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+    font-size: 11px;
+    line-height: 1.45;
+    color: #e8e8e8;
+    background: #141414;
+  }
+  .banner {
+    font-size: 10px;
+    line-height: 1.4;
+    padding: 3px 6px;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    border-bottom: 1px solid #000;
+  }
+  #staleBanner { background: #5a1f1f; color: #ffd9d9; }
+  #connBanner { background: #4a3a12; color: #ffe9a8; }
+  #vBanner { background: #3a2a5a; color: #ddd0ff; }
+  #layout {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 277px;
+    max-width: 277px;
+  }
+  #msgPane {
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    overflow-y: auto;
+    padding: 4px 6px;
+  }
+  .msg { margin: 0 0 5px 0; min-width: 0; }
+  .msg .meta {
+    font-size: 10px;
+    color: #9ad;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+  .msg .text {
+    font-size: 11px;
+    color: #e8e8e8;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+  #divider {
+    flex: 0 0 auto;
+    height: 1px;
+    background: #555;
+  }
+  #agentPane { flex: 0 0 auto; min-width: 0; }
+  #agentHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 6px;
+    font-size: 10px;
+    color: #aaa;
+    border-bottom: 1px solid #333;
+    min-width: 0;
+  }
+  #viewToggle button {
+    font-size: 10px;
+    background: none;
+    border: 1px solid #555;
+    color: #ccc;
+    padding: 1px 6px;
+    cursor: pointer;
+  }
+  #viewToggle button[aria-pressed="true"] {
+    background: #333;
+    color: #fff;
+    border-color: #888;
+  }
+  #agentList, #timeList {
+    min-width: 0;
+    overflow-y: auto;
+  }
+  .agent {
+    padding: 3px 6px 4px 6px;
+    border-bottom: 1px solid #262626;
+    min-width: 0;
+  }
+  .agent.blocked {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #2a1414;
+    border-left: 3px solid #e05353;
+  }
+  .agent .head {
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+  .agent .desc {
+    font-size: 10px;
+    color: #999;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+  /* O-3 측정 셀. 이 셀에만 ellipsis용 overflow를 둔다. */
+  .cur {
+    display: block;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .hist {
+    display: block;
+    font-size: 10px;
+    color: #bbb;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .st-active { color: #7dd87d; }
+  .st-listening { color: #e0c060; }
+  .st-blocked { color: #ff7b7b; }
+  .st-inactive { color: #777; }
+  .st-unknown { color: #777; }
+  .term {
+    font-size: 10px;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    word-break: break-all;
+    background: #0a0a0a;
+    border: 1px solid #333;
+    padding: 4px;
+    margin: 4px 0 2px 0;
+    max-height: 180px;
+    overflow-y: auto;
+    color: #cfcfcf;
+  }
+  .trow {
+    display: block;
+    font-size: 10px;
+    color: #ccc;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    padding: 1px 6px;
+  }
+  .trow .tt { color: #777; }
+</style>
+</head>
+<body>
+<div id="connBanner" class="banner" hidden></div>
+<div id="staleBanner" class="banner" hidden></div>
+<div id="vBanner" class="banner" hidden></div>
+<main id="layout">
+  <section id="msgPane" aria-label="hcom message stream">
+    <div id="msgList"></div>
+  </section>
+  <div id="divider"></div>
+  <section id="agentPane" aria-label="agents">
+    <header id="agentHeader">
+      <span>에이전트</span>
+      <span id="viewToggle">
+        <button id="viewAgents" data-view="agents" aria-pressed="true">별</button><button id="viewTime" data-view="time" aria-pressed="false">시간순</button>
+      </span>
+    </header>
+    <div id="agentList"></div>
+    <div id="timeList" hidden></div>
+  </section>
+</main>
+<script>
+(function () {
+  "use strict";
+
+  /* SCHEMA §3-1. 클라이언트 버전과 호환 하한. minClientV는 /version에서 갱신. */
+  var CLIENT_V = 1;
+  var minClientV = 1;
+
+  /* HISTORY_N: PRD FR-11. N=3 고정, 설정·쿼리로 변경 불가. */
+  var HISTORY_N = 3;
+  var BUFFER_MAX = 200;
+  var HEARTBEAT_STALE_MS = 30000;
+  var VIEW_KEY = "mushline.view";
+
+  var $ = function (id) { return document.getElementById(id); };
+  var msgList = $("msgList"), agentList = $("agentList"), timeList = $("timeList");
+  var connBanner = $("connBanner"), staleBanner = $("staleBanner"), vBanner = $("vBanner");
+  var viewAgentsBtn = $("viewAgents"), viewTimeBtn = $("viewTime");
+
+  var state = {
+    agents: [],
+    activities: [],   /* 오래된 순. DOM·이력의 원본 */
+    view: "agents",
+    healthOk: true,
+    healthSource: null,
+    healthReason: null,
+    seenIds: new Set(),
+    needClearOnSnapshot: false,
+    lastHeartbeatAt: 0,
+    everConnected: false,
+    openedCount: 0,
+    vDropped: 0,
+    expandedTerm: {},  /* name -> true */
+    lastBannerText: null
+  };
+
+  try {
+    var saved = window.localStorage.getItem(VIEW_KEY);
+    if (saved === "agents" || saved === "time") state.view = saved;
+  } catch (e) { /* localStorage 불가 환경에서는 기본 뷰 */ }
+
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+
+  /* SCHEMA §4 소유(W2): 당일은 HH:MM, 전일 이전은 MM-DD HH:MM. 상대시간 금지. */
+  function fmtTime(iso) {
+    if (iso === null || iso === undefined || iso === "") return "";
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    var now = new Date();
+    var sameDay = d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    var hm = pad(d.getHours()) + ":" + pad(d.getMinutes());
+    if (sameDay) return hm;
+    return pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + " " + hm;
+  }
+
+  /* SCHEMA §4 소유(W2): statusContext의 tool: 접두를 떼고
+     <label> + 공백 2칸 + <detail>. 한쪽 null이면 나머지만, 둘 다 null이면 (idle). */
+  function combineLine(statusContext, statusDetail) {
+    var label = statusContext;
+    if (typeof label === "string" && label.indexOf("tool:") === 0) {
+      label = label.slice(5);
+    }
+    var parts = [];
+    if (label !== null && label !== undefined && label !== "") parts.push(label);
+    if (statusDetail !== null && statusDetail !== undefined && statusDetail !== "") parts.push(statusDetail);
+    if (parts.length > 0) return parts.join("  ");
+    if (statusContext === null && statusDetail === null) return "(idle)";
+    return "";
+  }
+
+  function esc(text) { return text === null || text === undefined ? "" : String(text); }
+
+  function statusGlyph(status) {
+    if (status === "active") return "\u25B6";    /* ▶ */
+    if (status === "listening") return "\u25CF"; /* ● */
+    if (status === "blocked") return "\u25A0";   /* ■ */
+    if (status === "inactive") return "\u25CB";  /* ○ */
+    return "?";
+  }
+
+  /* --- 배너 --- */
+
+  /* SCHEMA §3-10: ok=false 배너는 ok=true까지 유지. 정상 snapshot이 와도 내리지 않는다. */
+  /* SCHEMA §3-11: heartbeat 30초 공백도 stale. */
+  function refreshStale() {
+    var hbStale = state.lastHeartbeatAt > 0 &&
+      (Date.now() - state.lastHeartbeatAt > HEARTBEAT_STALE_MS);
+    var stale = !state.healthOk || hbStale;
+    var text = null;
+    if (!state.healthOk) {
+      text = "STALE — " + esc(state.healthSource) + ": " + esc(state.healthReason);
+    } else if (hbStale) {
+      text = "STALE — heartbeat 30초 없음";
+    }
+    if (text === state.lastBannerText) return;
+    state.lastBannerText = text;
+    if (text === null) {
+      staleBanner.hidden = true;
+      staleBanner.textContent = "";
+    } else {
+      staleBanner.textContent = text;
+      staleBanner.hidden = false;
+    }
+  }
+
+  function setConn(text) {
+    if (text === null) {
+      connBanner.hidden = true;
+      connBanner.textContent = "";
+    } else {
+      connBanner.textContent = text;
+      connBanner.hidden = false;
+    }
+  }
+
+  /* SCHEMA §3-1: v가 minClientV 미만이거나 모르는 값이면 버리고 경고. 조용히 무시 금지. */
+  function checkVersion(ev) {
+    if (ev === null || ev === undefined || typeof ev.v !== "number") {
+      state.vDropped += 1;
+      vBanner.textContent = "버전 경고 — v 없음, 이벤트 " + state.vDropped + "건 버림";
+      vBanner.hidden = false;
+      return false;
+    }
+    if (ev.v < minClientV) {
+      state.vDropped += 1;
+      vBanner.textContent = "버전 경고 — v=" + ev.v + " < minClientV=" + minClientV +
+        ", 이벤트 " + state.vDropped + "건 버림";
+      vBanner.hidden = false;
+      return false;
+    }
+    return true;
+  }
+
+  /* --- 렌더 --- */
+
+  function sortedAgents() {
+    var blocked = [], rest = [];
+    state.agents.forEach(function (a) {
+      if (a.status === "blocked") blocked.push(a);
+      else rest.push(a);
+    });
+    return blocked.concat(rest);
+  }
+
+  function historyFor(name) {
+    var out = [];
+    for (var i = state.activities.length - 1; i >= 0; i--) {
+      if (state.activities[i].agent === name) {
+        out.push(state.activities[i]);
+        if (out.length >= HISTORY_N) break;
+      }
+    }
+    return out;
+  }
+
+  function activityLine(a) {
+    return combineLine("tool:" + a.label, a.detail);
+  }
+
+  function renderAgents() {
+    agentList.textContent = "";
+    var list = sortedAgents();
+    list.forEach(function (a) {
+      var wrap = document.createElement("div");
+      wrap.className = "agent" + (a.status === "blocked" ? " blocked" : "");
+
+      var head = document.createElement("div");
+      head.className = "head";
+      var glyph = document.createElement("span");
+      glyph.className = "st-" + esc(a.status);
+      glyph.textContent = statusGlyph(a.status) + " ";
+      head.appendChild(glyph);
+      head.appendChild(document.createTextNode(esc(a.name)));
+      head.setAttribute("data-agent", esc(a.name));
+      head.addEventListener("click", function () { toggleTerm(a.name); });
+      wrap.appendChild(head);
+
+      if (a.description !== null && a.description !== undefined && a.description !== "") {
+        var desc = document.createElement("div");
+        desc.className = "desc";
+        desc.textContent = esc(a.description);
+        wrap.appendChild(desc);
+      }
+
+      var cur = document.createElement("span");
+      cur.className = "cur";
+      cur.setAttribute("data-oracle", "current-line");
+      cur.textContent = combineLine(a.statusContext, a.statusDetail);
+      wrap.appendChild(cur);
+
+      var t = document.createElement("div");
+      t.className = "desc";
+      t.textContent = fmtTime(a.lastEventAt);
+      wrap.appendChild(t);
+
+      historyFor(a.name).forEach(function (h) {
+        var hline = document.createElement("span");
+        hline.className = "hist";
+        hline.textContent = fmtTime(h.ts) + " " + activityLine(h);
+        wrap.appendChild(hline);
+      });
+
+      if (state.expandedTerm[a.name]) {
+        var term = document.createElement("div");
+        term.className = "term";
+        term.setAttribute("data-term", a.name);
+        term.textContent = "불러오는 중…";
+        wrap.appendChild(term);
+        loadTerm(a.name, term);
+      }
+
+      agentList.appendChild(wrap);
+    });
+    /* FR-15: 5명 이상일 때만 하단 스크롤. 4명 이하에서는 max-height를 두지 않아
+       O-2①(무스크롤)을 구조적으로 보장한다. */
+    if (list.length >= 5) {
+      agentList.style.maxHeight = "55vh";
+    } else {
+      agentList.style.maxHeight = "";
+    }
+  }
+
+  function renderTime() {
+    timeList.textContent = "";
+    var acts = state.activities.slice().sort(function (x, y) {
+      return (x.ts < y.ts ? 1 : (x.ts > y.ts ? -1 : 0));
+    });
+    acts.forEach(function (a) {
+      var row = document.createElement("span");
+      row.className = "trow";
+      var tt = document.createElement("span");
+      tt.className = "tt";
+      tt.textContent = fmtTime(a.ts) + " " + a.agent + " ";
+      row.appendChild(tt);
+      row.appendChild(document.createTextNode(activityLine(a)));
+      timeList.appendChild(row);
+    });
+    timeList.style.maxHeight = state.agents.length >= 5 ? "55vh" : "";
+  }
+
+  function applyView() {
+    var isAgents = state.view === "agents";
+    agentList.hidden = !isAgents;
+    timeList.hidden = isAgents;
+    viewAgentsBtn.setAttribute("aria-pressed", isAgents ? "true" : "false");
+    viewTimeBtn.setAttribute("aria-pressed", isAgents ? "false" : "true");
+    if (isAgents) renderAgents();
+    else renderTime();
+  }
+
+  function setView(v) {
+    state.view = v;
+    try { window.localStorage.setItem(VIEW_KEY, v); } catch (e) { /* 무시 */ }
+    applyView();
+  }
+
+  viewAgentsBtn.addEventListener("click", function () { setView("agents"); });
+  viewTimeBtn.addEventListener("click", function () { setView("time"); });
+
+  /* 메시지: 최신이 아래, 자동 스크롤(맨 아래 근처일 때만 따라감). */
+  var msgPane = $("msgPane");
+  var stickToBottom = true;
+  msgPane.addEventListener("scroll", function () {
+    stickToBottom = (msgPane.scrollHeight - msgPane.scrollTop - msgPane.clientHeight) < 24;
+  });
+
+  function appendMessage(m) {
+    var wrap = document.createElement("div");
+    wrap.className = "msg";
+    var meta = document.createElement("div");
+    meta.className = "meta";
+    var to = (m.to && m.to.length) ? " → @" + m.to.join(",@") : "";
+    var intent = (m.intent !== null && m.intent !== undefined) ? "  " + m.intent : "";
+    meta.textContent = "● " + m.from + to + intent + "  " + fmtTime(m.ts);
+    var text = document.createElement("div");
+    text.className = "text";
+    text.textContent = esc(m.text);
+    wrap.appendChild(meta);
+    wrap.appendChild(text);
+    msgList.appendChild(wrap);
+    while (msgList.children.length > BUFFER_MAX) {
+      msgList.removeChild(msgList.firstChild);
+    }
+    if (stickToBottom) msgPane.scrollTop = msgPane.scrollHeight;
+  }
+
+  /* --- 이벤트 처리 --- */
+
+  function onSnapshot(ev) {
+    if (!checkVersion(ev)) return;
+    /* SCHEMA §3-4: 재연결 후 첫 snapshot에 중복 배제 윈도 파기. */
+    if (state.needClearOnSnapshot) {
+      state.seenIds.clear();
+      state.needClearOnSnapshot = false;
+    }
+    /* SCHEMA §3-5: agents는 전량. 없는 에이전트는 사라진 것으로 교체한다. */
+    state.agents = Array.isArray(ev.agents) ? ev.agents : [];
+    applyView();
+    refreshStale();
+  }
+
+  function onActivity(ev) {
+    if (!checkVersion(ev)) return;
+    if (ev.id !== null && ev.id !== undefined) {
+      if (state.seenIds.has(ev.id)) return;
+      state.seenIds.add(ev.id);
+      if (state.seenIds.size > 1000) {
+        var first = state.seenIds.values().next().value;
+        state.seenIds.delete(first);
+      }
+    }
+    state.activities.push({
+      id: ev.id, ts: ev.ts, agent: ev.agent,
+      kind: ev.kind, label: ev.label, detail: ev.detail
+    });
+    while (state.activities.length > BUFFER_MAX) state.activities.shift();
+    applyView();
+    refreshStale();
+  }
+
+  function onMessage(ev) {
+    if (!checkVersion(ev)) return;
+    if (ev.id !== null && ev.id !== undefined) {
+      if (state.seenIds.has(ev.id)) return;
+      state.seenIds.add(ev.id);
+    }
+    appendMessage(ev);
+    refreshStale();
+  }
+
+  function onHealth(ev) {
+    if (!checkVersion(ev)) return;
+    state.healthOk = ev.ok === true;
+    state.healthSource = ev.source !== undefined ? ev.source : null;
+    state.healthReason = ev.reason !== undefined ? ev.reason : null;
+    refreshStale();
+  }
+
+  function onHeartbeat(ev) {
+    if (!checkVersion(ev)) return;
+    state.lastHeartbeatAt = Date.now();
+    refreshStale();
+  }
+
+  /* --- 터미널 펼치기 (FR-14) --- */
+
+  function toggleTerm(name) {
+    if (state.expandedTerm[name]) {
+      delete state.expandedTerm[name];
+    } else {
+      state.expandedTerm[name] = true;
+    }
+    if (state.view === "agents") renderAgents();
+  }
+
+  function loadTerm(name, node) {
+    fetch("/term/" + encodeURIComponent(name) + "?n=20")
+      .then(function (res) {
+        return res.json().then(function (body) {
+          return { status: res.status, body: body };
+        });
+      })
+      .then(function (r) {
+        if (r.status === 200 && r.body && Array.isArray(r.body.lines)) {
+          node.textContent = r.body.lines.join("\n");
+        } else if (r.body && r.body.reason) {
+          node.textContent = "term 오류: " + esc(r.body.error) + " — " + esc(r.body.reason);
+        } else {
+          node.textContent = "term 오류: HTTP " + r.status;
+        }
+      })
+      .catch(function (err) {
+        node.textContent = "term 불러오기 실패: " + String(err && err.message || err);
+      });
+  }
+
+  /* --- heartbeat 감시 (SCHEMA §3-11) ---
+     setInterval 금지. paint(rAF)·visibilitychange 시점의 Date.now() 차분으로만 감시한다. */
+  function tick() {
+    refreshStale();
+    window.requestAnimationFrame(tick);
+  }
+  document.addEventListener("visibilitychange", function () {
+    refreshStale();
+  });
+
+  /* --- 기동 --- */
+
+  function boot() {
+    var params = new URLSearchParams(window.location.search);
+    var fixturePath = params.get("fixture");
+    var forceSample = params.get("sample") === "1";
+
+    fetch("/version")
+      .then(function (res) { return res.json(); })
+      .then(function (v) {
+        if (v && typeof v.minClientV === "number") minClientV = v.minClientV;
+      })
+      .catch(function () { /* 버전 조회 실패는 오프라인 폴백에서 처리 */ })
+      .then(function () {
+        if (forceSample) {
+          loadSample("예시 모드 (?sample=1)");
+          return;
+        }
+        if (fixturePath) {
+          loadFixture(fixturePath);
+          return;
+        }
+        if (typeof window.EventSource === "undefined") {
+          loadSample("EventSource 없음 — 예시 표시");
+          return;
+        }
+        connect();
+      });
+
+    window.requestAnimationFrame(tick);
+    applyView();
+  }
+
+  function connect() {
+    var es;
+    try {
+      es = new window.EventSource("/events");
+    } catch (e) {
+      loadSample("연결 실패 — 예시 표시");
+      return;
+    }
+    var gotSnapshot = false;
+    var failTimer = null;
+
+    es.onopen = function () {
+      state.openedCount += 1;
+      /* 재연결이면 다음 snapshot이 중복 윈도 파기의 신호다 (§3-4). */
+      if (state.openedCount > 1) state.needClearOnSnapshot = true;
+      state.lastHeartbeatAt = Date.now();
+      state.everConnected = true;
+      setConn(null);
+      refreshStale();
+    };
+    es.addEventListener("snapshot", function (e) {
+      gotSnapshot = true;
+      try { onSnapshot(JSON.parse(e.data)); }
+      catch (err) { /* 파싱 실패는 버린다 */ }
+    });
+    es.addEventListener("activity", function (e) {
+      try { onActivity(JSON.parse(e.data)); }
+      catch (err) { /* 파싱 실패는 버린다 */ }
+    });
+    es.addEventListener("message", function (e) {
+      try { onMessage(JSON.parse(e.data)); }
+      catch (err) { /* 파싱 실패는 버린다 */ }
+    });
+    es.addEventListener("health", function (e) {
+      try { onHealth(JSON.parse(e.data)); }
+      catch (err) { /* 파싱 실패는 버린다 */ }
+    });
+    es.addEventListener("heartbeat", function (e) {
+      try { onHeartbeat(JSON.parse(e.data)); }
+      catch (err) { /* 파싱 실패는 버린다 */ }
+    });
+    es.onerror = function () {
+      /* EventSource는 자동 재시도한다. 첫 snapshot 전 실패면 예시로 기립한다
+         (SCHEMA §5: 실서버 없이 화면이 떠야 한다). */
+      if (!gotSnapshot && !state.everConnected) {
+        loadSample("서버 없음 — 예시 표시 (OFFLINE)");
+      } else {
+        setConn("연결 끊김 — 재연결 중…");
+      }
+    };
+    /* failTimer를 쓰지 않는다: setTimeout도 백그라운드 스로틀 대상이며,
+       예시 폴백은 onerror 경로 하나로만 처리한다. */
+    void failTimer;
+  }
+
+  /* SCHEMA §1 예시 페이로드 기반 내장 샘플.
+     실서버 없이 화면이 서는 것이 W1·W2 동시 진행의 전제다 (§5). */
+  function sampleEvents() {
+    var now = new Date();
+    var iso = now.toISOString();
+    var old = new Date(now.getTime() - 26 * 3600 * 1000).toISOString();
+    return {
+      snapshot: {
+        v: 1, ts: iso,
+        agents: [
+          { name: "lune", status: "active", statusContext: "tool:Bash",
+            statusDetail: "bun run src/server.ts", description: "서버·SSE 담당",
+            directory: "/Users/x/mushline", unreadCount: 0, lastEventAt: iso },
+          { name: "nova", status: "blocked", statusContext: "approval",
+            statusDetail: "Bash", description: "프론트 렌더 담당",
+            directory: "/Users/x/mushline", unreadCount: 0, lastEventAt: iso },
+          { name: "sona", status: "listening", statusContext: null,
+            statusDetail: null, description: "문서 정리 담당",
+            directory: "/Users/x/mushline", unreadCount: 0, lastEventAt: old }
+        ]
+      },
+      activities: [
+        { v: 1, id: "sample-1", ts: iso, agent: "lune",
+          kind: "tool", label: "Edit", detail: "src/server.ts" },
+        { v: 1, id: "sample-2", ts: iso, agent: "nova",
+          kind: "cmd", label: "Bash", detail: "bun test --watch" }
+      ],
+      messages: [
+        { v: 1, id: "sample-m1", ts: iso, from: "lune", to: ["nova"],
+          intent: "request", thread: null, text: "경계 스키마 v1 올렸음" },
+        { v: 1, id: "sample-m2", ts: iso, from: "nova", to: ["lune"],
+          intent: "ack", thread: null, text: "받음. 렌더 붙인다" }
+      ]
+    };
+  }
+
+  function loadSample(label) {
+    var s = sampleEvents();
+    setConn(label);
+    onSnapshot(s.snapshot);
+    s.activities.forEach(onActivity);
+    s.messages.forEach(onMessage);
+  }
+
+  /* W1의 fixtures/oracle-set.json 갈아끼우기 경로. 형태가 다르면 경고를 낸다. */
+  function loadFixture(path) {
+    fetch(path)
+      .then(function (res) { return res.json(); })
+      .then(function (f) {
+        setConn("fixture: " + path);
+        var snap = f.snapshot || f;
+        if (snap && Array.isArray(snap.agents)) onSnapshot(snap);
+        var acts = f.activities || f.activity || [];
+        acts.forEach(onActivity);
+        var msgs = f.messages || f.message || [];
+        msgs.forEach(onMessage);
+      })
+      .catch(function () {
+        loadSample("fixture 실패 — 예시 표시 (OFFLINE)");
+      });
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
