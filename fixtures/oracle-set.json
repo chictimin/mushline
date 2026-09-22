@@ -1,0 +1,469 @@
+{
+  "v": 1,
+  "snapshot": {
+    "v": 1,
+    "ts": "2026-09-22T06:30:00.000Z",
+    "agents": [
+      {
+        "name": "lune",
+        "status": "active",
+        "statusContext": "tool:Bash",
+        "statusDetail": "bun run src/server.ts --db-path /tmp/mushline-fixture.db --db-path /tmp/mushline-fixture.db --hcom-bin /usr/local/bin/hcom --retry 3 --verbose 2>&1 | tee /tmp/mushline-measure/run-oracle-set-$(date +%Y%m%dT%H%M%S).log --db-path /tmp/mushline-fixture.db --hcom-bin /usr/local/bin/hcom --retry 3 --verbose 2>&1 | tee /tmp/mushline-measure/run-oracle-set-$(date +%Y%m%dT%H%M%S).log --db-path /tmp/mushline-fixture.db --hcom-bin /usr/local/bin/hcom --retry 3 --verbose 2>&1 | tee /tmp/mushline-measure/ru",
+        "description": "서버·SSE·폴링 담당. hcom DB를 읽기 전용으로 열고 events_v를 200ms 폴링한다 · 병렬 에이전트 모니터링 판 mushline",
+        "directory": "/Users/mjolnir/Desktop/code/mushline-w1",
+        "unreadCount": 0,
+        "lastEventAt": "2026-09-22T06:29:58.000Z"
+      },
+      {
+        "name": "nova",
+        "status": "active",
+        "statusContext": "tool:Edit",
+        "statusDetail": "/Users/mjolnir/Desktop/code/mushline-w2/src/ui.html --db-path /tmp/mushline-fixture.db --hcom-bin /usr/local/bin/hcom --retry 3 --verbose 2>&1 | tee /tmp/mushline-measure/run-oracle-set-$(date +%Y%m%dT%H%M%S).log --db-path /tmp/mushline-fixture.db --hcom-bin /usr/local/bin/hcom --retry 3 --verbose 2>&1 | tee /tmp/mushline-measure/run-oracle-set-$(date +%Y%m%dT%H%M%S).log --db-path /tmp/mushline-fixture.db --hcom-bin /usr/local/bin/hcom --retry 3 --verbose 2>&1 | tee /tmp/mushline-measure/run-ora",
+        "description": "프론트 렌더 담당. 277px 레이아웃·말줄임·정렬·sticky·stale 배너를 만든다 · 병렬 에이전트 모니터링 판 mushline의 더블체",
+        "directory": "/Users/mjolnir/Desktop/code/mushline-w2",
+        "unreadCount": 3,
+        "lastEventAt": "2026-09-22T06:29:51.000Z"
+      },
+      {
+        "name": "sona",
+        "status": "blocked",
+        "statusContext": "approval",
+        "statusDetail": "Bash: rm -rf /tmp/mushline-measure 승인 대기 중 --db-path /tmp/mushline-fixture.db --hcom-bin /usr/local/bin/hcom --retry 3 --verbose 2>&1 | tee /tmp/mushline-measure/run-oracle-set-$(date +%Y%m%dT%H%M%S).log --db-path /tmp/mushline-fixture.db --hcom-bin /usr/local/bin/hcom --retry 3 --verbose 2>&1 | tee /tmp/mushline-measure/run-oracle-set-$(date +%Y%m%dT%H%M%S).log --db-path /tmp/mushline-fixture.db --hcom-bin /usr/local/bin/hcom --retry 3 --verbose 2>&1 | tee /tmp/mushline-measure/run-oracle-set-$",
+        "description": "측정 실행 담당. 깨끗한 clone에서 선정자가 고른 명령을 그대로 재실행한다 · 병렬 에이전트 모니터링 판 mushline의 더블체크 축으로 ",
+        "directory": "/tmp/mushline-clone",
+        "unreadCount": 12,
+        "lastEventAt": "2026-09-22T06:28:40.000Z"
+      },
+      {
+        "name": "miro",
+        "status": "listening",
+        "statusContext": "",
+        "statusDetail": "(대기 중) 직전 작업은 fixtures/oracle-set.json 검토였다 --db-path /tmp/mushline-fixture.db --hcom-bin /usr/local/bin/hcom --retry 3 --verbose 2>&1 | tee /tmp/mushline-measure/run-oracle-set-$(date +%Y%m%dT%H%M%S).log --db-path /tmp/mushline-fixture.db --hcom-bin /usr/local/bin/hcom --retry 3 --verbose 2>&1 | tee /tmp/mushline-measure/run-oracle-set-$(date +%Y%m%dT%H%M%S).log --db-path /tmp/mushline-fixture.db --hcom-bin /usr/local/bin/hcom --retry 3 --verbose 2>&1 | tee /tmp/mushline-measure/run-oracle-set-",
+        "description": "감사 담당. 주장과 실물의 일치만 판정하고 결함이냐 사양이냐는 판정하지 않는다 · 병렬 에이전트 모니터링 판 mushline의 더블체크 축으로 ",
+        "directory": null,
+        "unreadCount": 0,
+        "lastEventAt": "2026-09-22T06:20:03.000Z"
+      }
+    ]
+  },
+  "activities": [
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-1",
+      "ts": "2026-09-22T06:20:01.000Z",
+      "agent": "lune",
+      "kind": "life",
+      "label": "ready",
+      "detail": null
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-2",
+      "ts": "2026-09-22T06:20:02.000Z",
+      "agent": "lune",
+      "kind": "cmd",
+      "label": "Bash",
+      "detail": "bun run src/server.ts --db-path /tmp/mushline-fixture-0.db"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-3",
+      "ts": "2026-09-22T06:20:03.000Z",
+      "agent": "lune",
+      "kind": "file",
+      "label": "Edit",
+      "detail": "/Users/mjolnir/Desktop/code/mushline-w1/src/server.ts"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-4",
+      "ts": "2026-09-22T06:20:04.000Z",
+      "agent": "lune",
+      "kind": "tool",
+      "label": "send",
+      "detail": "@lame --intent inform -- lune 진행 상황 보고 0"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-5",
+      "ts": "2026-09-22T06:20:05.000Z",
+      "agent": "lune",
+      "kind": "status",
+      "label": "active",
+      "detail": ""
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-6",
+      "ts": "2026-09-22T06:21:01.000Z",
+      "agent": "nova",
+      "kind": "life",
+      "label": "started",
+      "detail": null
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-7",
+      "ts": "2026-09-22T06:21:02.000Z",
+      "agent": "nova",
+      "kind": "cmd",
+      "label": "Bash",
+      "detail": "bun run src/server.ts --db-path /tmp/mushline-fixture-1.db"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-8",
+      "ts": "2026-09-22T06:21:03.000Z",
+      "agent": "nova",
+      "kind": "file",
+      "label": "Write",
+      "detail": "/Users/mjolnir/Desktop/code/mushline-w1/src/ui.html"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-9",
+      "ts": "2026-09-22T06:21:04.000Z",
+      "agent": "nova",
+      "kind": "tool",
+      "label": "list",
+      "detail": "@lame --intent inform -- nova 진행 상황 보고 1"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-10",
+      "ts": "2026-09-22T06:21:05.000Z",
+      "agent": "nova",
+      "kind": "status",
+      "label": "listening",
+      "detail": ""
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-11",
+      "ts": "2026-09-22T06:22:01.000Z",
+      "agent": "sona",
+      "kind": "life",
+      "label": "created",
+      "detail": null
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-12",
+      "ts": "2026-09-22T06:22:02.000Z",
+      "agent": "sona",
+      "kind": "cmd",
+      "label": "Bash",
+      "detail": "bun run src/server.ts --db-path /tmp/mushline-fixture-2.db"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-13",
+      "ts": "2026-09-22T06:22:03.000Z",
+      "agent": "sona",
+      "kind": "file",
+      "label": "write",
+      "detail": "/Users/mjolnir/Desktop/code/mushline-w1/src/notes.md"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-14",
+      "ts": "2026-09-22T06:22:04.000Z",
+      "agent": "sona",
+      "kind": "tool",
+      "label": "term",
+      "detail": "@lame --intent inform -- sona 진행 상황 보고 2"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-15",
+      "ts": "2026-09-22T06:22:05.000Z",
+      "agent": "sona",
+      "kind": "status",
+      "label": "blocked",
+      "detail": "Bash"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-16",
+      "ts": "2026-09-22T06:23:01.000Z",
+      "agent": "miro",
+      "kind": "life",
+      "label": "stopped",
+      "detail": null
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-17",
+      "ts": "2026-09-22T06:23:02.000Z",
+      "agent": "miro",
+      "kind": "cmd",
+      "label": "Bash",
+      "detail": "bun run src/server.ts --db-path /tmp/mushline-fixture-3.db"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-18",
+      "ts": "2026-09-22T06:23:03.000Z",
+      "agent": "miro",
+      "kind": "file",
+      "label": "NotebookEdit",
+      "detail": "/Users/mjolnir/Desktop/code/mushline-w1/src/probe.ipynb"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-19",
+      "ts": "2026-09-22T06:23:04.000Z",
+      "agent": "miro",
+      "kind": "tool",
+      "label": "Agent",
+      "detail": "@lame --intent inform -- miro 진행 상황 보고 3"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-20",
+      "ts": "2026-09-22T06:23:05.000Z",
+      "agent": "miro",
+      "kind": "status",
+      "label": "inactive",
+      "detail": ""
+    }
+  ],
+  "messages": [
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-21",
+      "ts": "2026-09-21T23:58:00.000Z",
+      "from": "lune",
+      "to": [
+        "nova"
+      ],
+      "intent": "inform",
+      "thread": null,
+      "text": "자정 직전 메시지. 날짜 경계 표시가 빠지면 이 줄이 오늘 것보다 뒤로 보인다"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-22",
+      "ts": "2026-09-22T06:10:07.000Z",
+      "from": "nova",
+      "to": [
+        "sona"
+      ],
+      "intent": "inform",
+      "thread": null,
+      "text": "nova → @sona · 경계 계약 rev4 기준 1번째 메시지"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-23",
+      "ts": "2026-09-22T06:11:14.000Z",
+      "from": "sona",
+      "to": [
+        "miro"
+      ],
+      "intent": "ack",
+      "thread": null,
+      "text": "sona → @miro · 경계 계약 rev4 기준 2번째 메시지"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-24",
+      "ts": "2026-09-22T06:11:21.000Z",
+      "from": "miro",
+      "to": [
+        "lune"
+      ],
+      "intent": null,
+      "thread": null,
+      "text": "긴 본문이 상단 스트림에서 가로로 넘치지 않는지 보기 위한 문자열이다. 긴 본문이 상단 스트림에서 가로로 넘치지 않는지 보기 위한 문자열이다. 긴 본문이 상단 스트림에서 가로로 넘치지 않는지 보기 위한 문자열이다. 긴 본문이 상단 스트림에서 가로로 넘치지 않는지 보기 위한 문자열이다. 긴 본문이 상단 스트림에서 가로로 넘치지 않는지 보기 위한 문자열이다. 긴 본문이 상단 스트림에서 가로로 넘치지 않는지 보기 위한 문자열이다. 긴 본문이 상단 스트림에서 가로로 넘치지 않는지 보기 위한 문자열이다. 긴 본문이 상단 스트림에서 가로로 넘치지 않는지 보기 위한 문자열이다. 긴 본문이 상단 스트림에서 가로로 넘치지 않는지 보기 위한 문자열이다. 긴 본문이 상단 스트림에서 가로로 넘치지 않는지 보기 위한 문자열이다. 긴 본문이 상단 스트림에서 가로로 넘"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-25",
+      "ts": "2026-09-22T06:12:28.000Z",
+      "from": "lune",
+      "to": [
+        "nova"
+      ],
+      "intent": "request",
+      "thread": null,
+      "text": "lune → @nova · 경계 계약 rev4 기준 4번째 메시지"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-26",
+      "ts": "2026-09-22T06:12:35.000Z",
+      "from": "nova",
+      "to": [
+        "sona"
+      ],
+      "intent": "inform",
+      "thread": "boundary-rev4",
+      "text": "nova → @sona · 경계 계약 rev4 기준 5번째 메시지"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-27",
+      "ts": "2026-09-22T06:13:42.000Z",
+      "from": "sona",
+      "to": [
+        "miro"
+      ],
+      "intent": "ack",
+      "thread": null,
+      "text": "sona → @miro · 경계 계약 rev4 기준 6번째 메시지"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-28",
+      "ts": "2026-09-22T06:13:49.000Z",
+      "from": "miro",
+      "to": [],
+      "intent": null,
+      "thread": null,
+      "text": "miro → (broadcast) · 경계 계약 rev4 기준 7번째 메시지"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-29",
+      "ts": "2026-09-22T06:14:56.000Z",
+      "from": "lune",
+      "to": [
+        "nova"
+      ],
+      "intent": "request",
+      "thread": null,
+      "text": "lune → @nova · 경계 계약 rev4 기준 8번째 메시지"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-30",
+      "ts": "2026-09-22T06:14:03.000Z",
+      "from": "nova",
+      "to": [
+        "sona"
+      ],
+      "intent": "inform",
+      "thread": null,
+      "text": "nova → @sona · 경계 계약 rev4 기준 9번째 메시지"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-31",
+      "ts": "2026-09-22T06:15:10.000Z",
+      "from": "sona",
+      "to": [
+        "miro"
+      ],
+      "intent": "ack",
+      "thread": "boundary-rev4",
+      "text": "sona → @miro · 경계 계약 rev4 기준 10번째 메시지"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-32",
+      "ts": "2026-09-22T06:15:17.000Z",
+      "from": "miro",
+      "to": [
+        "lune"
+      ],
+      "intent": null,
+      "thread": null,
+      "text": "miro → @lune · 경계 계약 rev4 기준 11번째 메시지"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-33",
+      "ts": "2026-09-22T06:16:24.000Z",
+      "from": "lune",
+      "to": [
+        "nova"
+      ],
+      "intent": "request",
+      "thread": null,
+      "text": "lune → @nova · 경계 계약 rev4 기준 12번째 메시지"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-34",
+      "ts": "2026-09-22T06:16:31.000Z",
+      "from": "nova",
+      "to": [
+        "sona"
+      ],
+      "intent": "inform",
+      "thread": null,
+      "text": "nova → @sona · 경계 계약 rev4 기준 13번째 메시지"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-35",
+      "ts": "2026-09-22T06:17:38.000Z",
+      "from": "sona",
+      "to": [],
+      "intent": "ack",
+      "thread": null,
+      "text": "sona → (broadcast) · 경계 계약 rev4 기준 14번째 메시지"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-36",
+      "ts": "2026-09-22T06:17:45.000Z",
+      "from": "miro",
+      "to": [
+        "lune"
+      ],
+      "intent": null,
+      "thread": "boundary-rev4",
+      "text": "miro → @lune · 경계 계약 rev4 기준 15번째 메시지"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-37",
+      "ts": "2026-09-22T06:18:52.000Z",
+      "from": "lune",
+      "to": [
+        "nova"
+      ],
+      "intent": "request",
+      "thread": null,
+      "text": "lune → @nova · 경계 계약 rev4 기준 16번째 메시지"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-38",
+      "ts": "2026-09-22T06:18:59.000Z",
+      "from": "nova",
+      "to": [
+        "sona"
+      ],
+      "intent": "inform",
+      "thread": null,
+      "text": "nova → @sona · 경계 계약 rev4 기준 17번째 메시지"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-39",
+      "ts": "2026-09-22T06:19:06.000Z",
+      "from": "sona",
+      "to": [
+        "miro"
+      ],
+      "intent": "ack",
+      "thread": null,
+      "text": "sona → @miro · 경계 계약 rev4 기준 18번째 메시지"
+    },
+    {
+      "v": 1,
+      "id": "fixture-2026-09-22T06:00:00.000Z-40",
+      "ts": "2026-09-22T06:19:13.000Z",
+      "from": "miro",
+      "to": [
+        "lune"
+      ],
+      "intent": null,
+      "thread": null,
+      "text": "miro → @lune · 경계 계약 rev4 기준 19번째 메시지"
+    }
+  ]
+}
