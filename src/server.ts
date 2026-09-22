@@ -48,6 +48,7 @@ type Kind = "tool" | "file" | "cmd" | "life" | "status" | "other";
 
 interface Agent {
   name: string;
+  tag: string | null;
   status: AgentStatus;
   statusContext: string | null;
   statusDetail: string | null;
@@ -395,6 +396,7 @@ function agentsFromCli(raw: unknown[]): Agent[] {
     const name = (nullable(a.base_name) ?? nullable(a.name) ?? "").trim();
     return {
       name,
+      tag: nullable(a.tag),
       status: normStatus(a.status),
       statusContext: nullable(a.status_context),
       statusDetail: nullable(a.status_detail),
@@ -409,12 +411,13 @@ function agentsFromCli(raw: unknown[]): Agent[] {
 function agentsFromDb(): Agent[] {
   if (!db) return [];
   const rows = db
-    .query("SELECT name, status, status_context, status_detail, directory FROM instances")
+    .query("SELECT name, tag, status, status_context, status_detail, directory FROM instances")
     .all() as Array<Record<string, unknown>>;
   return rows.map((r) => {
     const name = String(r.name ?? "");
     return {
       name,
+      tag: nullable(r.tag),
       status: normStatus(r.status),
       statusContext: nullable(r.status_context),
       statusDetail: nullable(r.status_detail),
