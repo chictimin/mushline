@@ -2,63 +2,119 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>mushline</title>
 <style>
+  :root {
+    --bg: #14151f; --surface: #1c1e29; --surface-2: #242736;
+    --fg: #e6e8ef; --muted: #9aa0b4; --faint: #6f7590;
+    --border: #282b3a; --border-strong: #3a3e54;
+    --accent: oklch(72% 0.13 250);
+    --danger: #ff7b7b; --warn: #e0c060; --ok: #7dd87d; --idle: #8e8e93;
+    --font-display: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+    --font-body: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  }
   * { box-sizing: border-box; }
   html, body {
     margin: 0;
     padding: 0;
     width: 100%;
+    height: 100%;
     min-width: 277px;
     max-width: 100%;
+    overscroll-behavior: none;
     /* NOTE(O-1): 조상 전수에 overflow-x:hidden 금지. 잘림 은폐가 아니라
        셀 ellipsis + 줄바꿈으로 폭을 맞춘다. */
   }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+    font-family: var(--font-body);
     font-size: 13px;
-    line-height: 1.45;
-    color: #e8e8e8;
-    background: #141414;
+    line-height: 1.7;
+    color: var(--fg);
+    background: var(--bg);
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
   }
   .banner {
-    font-size: 13px;
-    line-height: 1.4;
-    padding: 3px 6px;
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    z-index: 20;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    line-height: 1.5;
+    padding: 8px 12px;
     overflow-wrap: break-word;
     word-break: break-word;
-    border-bottom: 1px solid #000;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.45);
   }
+  .banner[hidden] { display: none; }
   #staleBanner { background: #5a1f1f; color: #ffd9d9; }
   #connBanner { background: #4a3a12; color: #ffe9a8; }
   #vBanner { background: #3a2a5a; color: #ddd0ff; }
   #layout {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    flex: 1 1 auto;
+    min-height: 0;
     width: 100%;
     min-width: 277px;
     max-width: 100%;
   }
   #msgPane {
-    flex: 1 1 auto;
+    flex: 1 1 55%;
     min-height: 0;
     min-width: 0;
     overflow-y: auto;
     overflow-anchor: auto;
-    padding: 4px 6px;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 0;
   }
-  .msg { margin: 0 0 6px 0; padding-bottom: 5px; border-bottom: 1px solid #262626; min-width: 0; }
+  .msg {
+    margin: 0;
+    padding: 6px 8px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    min-width: 0;
+  }
   .msg .meta {
-    font-size: 13px;
-    color: #9ad;
+    position: relative;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    color: #9ecfff;
     overflow-wrap: break-word;
     word-break: break-word;
+    line-height: 1.5;
+    margin-bottom: 4px;
   }
+  .msg .meta .intent {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  .msg .meta .intent::before { content: "· "; }
   .msg .text {
     font-size: 13px;
-    color: #e8e8e8;
+    line-height: 1.7;
+    color: var(--fg);
     overflow-wrap: break-word;
     word-break: break-word;
     white-space: pre-wrap;
@@ -66,182 +122,324 @@
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    max-width: 65ch;
   }
+  .msg .ts { color: var(--faint); }
+  .msg.clamped .meta, .msg.expanded .meta { cursor: pointer; padding-right: 18px; }
+  .msg.clamped .meta:hover, .msg.expanded .meta:hover { color: #c4dcff; }
+  .msg:hover, .trow:hover { background: rgba(255,255,255,0.03); }
+  .msg.expanded .text {
+    display: block;
+    overflow: visible;
+  }
+  .msg .exp {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 1px;
+    color: var(--faint);
+  }
+  .msg .exp svg { display: block; }
+  .msg.clamped .exp, .msg.expanded .exp { display: inline-flex; }
+  .msg.expanded .exp svg { transform: rotate(180deg); }
   #divider {
     flex: 0 0 auto;
     height: 1px;
-    background: #555;
+    background: var(--border-strong);
   }
   #topTabs {
     position: sticky;
     top: 0;
     z-index: 2;
-    background: #141414;
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    padding: 3px 6px;
-    font-size: 13px;
-    color: #aaa;
-    border-bottom: 1px solid #333;
-    min-width: 0;
-    flex: 0 0 auto;
-  }
-  #agentPane { flex: 0 0 auto; min-width: 0; }
-  #agentHeader {
+    background: var(--bg);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 3px 6px;
-    font-size: 13px;
-    color: #aaa;
-    border-bottom: 1px solid #333;
+    gap: 8px;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
     min-width: 0;
+    flex: 0 0 auto;
   }
+  #viewToggle { display: flex; gap: 4px; min-width: 0; }
   #viewToggle button {
-    font-size: 13px;
-    background: none;
-    border: 1px solid #555;
-    color: #ccc;
-    padding: 1px 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-body);
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    font-weight: 600;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: var(--muted);
+    min-height: 32px;
+    min-width: 44px;
+    padding: 4px 10px;
     cursor: pointer;
   }
+  #viewToggle button:hover { background: rgba(255,255,255,0.05); color: var(--fg); }
   #viewToggle button[aria-pressed="true"] {
-    background: #333;
-    color: #fff;
-    border-color: #888;
+    background: rgba(255,255,255,0.1);
+    color: var(--fg);
+  }
+  #agentPane {
+    flex: 1 1 45%;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  #agentHeader {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-bottom: 1px solid var(--border);
+    min-width: 0;
+  }
+  #agentHeader .title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  #agentHeader .count {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--faint);
+    letter-spacing: 0.02em;
   }
   #agentList, #timeList {
     min-width: 0;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
+  #agentList { flex: 1 1 auto; min-height: 0; }
   /* UI 배치 #3: FR-15 max-height는 인라인 스타일이 아니라 tall 클래스로만 건다. */
-  #agentList.tall { max-height: 55vh; }
+  #agentList.tall { max-height: 100%; }
   /* 상단 목록은 #msgPane 스크롤에 맡긴다. max-height를 두지 않는다. */
   #timeList { max-height: none; }
   /* FR-11: 이력 영역 클릭 → 모달. N 상한은 HISTORY_N이 건다. */
-  .hwrap { min-width: 0; cursor: pointer; }
+  .hwrap { position: relative; min-width: 0; border-radius: 4px; }
+  .hwrap .hist { padding-right: 26px; }
+  .hexpand {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    color: var(--faint);
+    cursor: pointer;
+    padding: 0;
+  }
+  .hexpand svg { width: 12px; height: 12px; }
+  .hexpand:hover { color: var(--fg); background: rgba(255,255,255,0.06); }
   #histModal {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
     z-index: 10;
     background: rgba(0,0,0,.6);
-    padding: 12px 8px;
+    padding: calc(16px + env(safe-area-inset-top, 0px)) 8px calc(16px + env(safe-area-inset-bottom, 0px));
   }
   #histModal[hidden] { display: none; }
   #histDlg {
-    background: #1c1c1c;
-    border: 1px solid #555;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
     max-width: 100%;
     max-height: 80vh;
+    max-height: 80dvh;
     overflow-y: auto;
-    padding: 6px 8px;
+    padding: 8px;
   }
-  #histDlg .mhead { font-size: 13px; color: #aaa; padding: 2px 0 4px 0; }
+  #histDlg .mhead {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    padding: 4px 0 8px 0;
+  }
+  #histTitle {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   #histDlg .mrow {
-    font-size: 13px;
-    color: #e8e8e8;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.5;
+    letter-spacing: 0.01em;
+    color: var(--fg);
     overflow-wrap: break-word;
     word-break: break-word;
     white-space: pre-wrap;
-    padding: 2px 0;
-    border-bottom: 1px solid #262626;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
   }
+  #histDlg .mrow:hover { background: rgba(255,255,255,0.03); }
   .agent {
-    padding: 3px 6px 4px 6px;
-    border-bottom: 1px solid #262626;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
     min-width: 0;
   }
+  .agent:hover { background: rgba(255,255,255,0.03); }
   .agent.blocked {
     position: sticky;
     top: 0;
     z-index: 1;
-    background: #2a1414;
+    background: #241f2b;
     border-left: 3px solid #e05353;
   }
   .agent .head {
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
-    gap: 6px;
-    font-size: 13px;
-    font-weight: bold;
+    align-items: center;
+    gap: 8px;
     min-width: 0;
+    margin-bottom: 4px;
   }
   .agent .aname {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .agent .who {
-    display: flex;
-    align-items: baseline;
-    gap: 4px;
-    min-width: 0;
-  }
+  .agent .who { display: flex; align-items: center; gap: 4px; min-width: 0; }
   .agent .tool {
     flex: none;
-    font-size: 13px;
-    border: 1px solid #555;
-    color: #ccc;
-    padding: 0 4px;
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    color: var(--faint);
+    margin-left: 2px;
+    padding: 0;
     white-space: nowrap;
   }
+  .agent .tool::before {
+    content: "";
+    width: 1px;
+    height: 10px;
+    background: var(--border-strong);
+    margin-right: 6px;
+  }
+  .agent .sglyph { flex: none; font-size: 11px; }
+  .sg-active { color: var(--ok); }
+  .sg-listening { color: var(--warn); }
+  .sg-blocked { color: var(--danger); }
+  .sg-inactive, .sg-unknown { color: var(--idle); }
   .agent .st {
     flex: none;
-    font-weight: normal;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
     white-space: nowrap;
   }
+  .st-active { color: var(--ok); }
+  .st-listening { color: var(--warn); }
+  .st-blocked { color: var(--danger); }
+  .st-inactive, .st-unknown { color: var(--idle); }
   .agent .desc {
-    font-size: 13px;
-    color: #999;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--muted);
     overflow-wrap: break-word;
     word-break: break-word;
+    margin-bottom: 4px;
+    max-width: 65ch;
   }
   /* O-3 측정 셀. 이 셀에만 ellipsis용 overflow를 둔다. */
   .cur {
     display: block;
-    font-size: 13px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.5;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
+    color: var(--fg);
   }
   .hist {
     display: block;
-    font-size: 13px;
-    color: #bbb;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.5;
+    letter-spacing: 0.01em;
+    color: var(--muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
   }
-  .hexp {
-    font-size: 13px;
+  #histClose {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
     background: none;
-    border: 1px solid #555;
-    color: #ccc;
-    padding: 0 6px;
-    margin: 2px 0 0 0;
+    border: none;
+    border-radius: 4px;
+    color: var(--faint);
     cursor: pointer;
+    padding: 0;
   }
-  .st-active { color: #7dd87d; }
-  .st-listening { color: #e0c060; }
-  .st-blocked { color: #ff7b7b; }
-  .st-inactive { color: #777; }
-  .st-unknown { color: #777; }
+  #histClose:hover { color: var(--fg); background: rgba(255,255,255,0.06); }
+  #histClose svg { width: 14px; height: 14px; }
   .trow {
     display: block;
-    font-size: 13px;
-    color: #ccc;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--fg);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
-    padding: 1px 6px;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
   }
-  .trow .tt { color: #777; }
+  .trow .tt { color: var(--faint); }
+  .trow .kind {
+    display: inline-block;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    padding: 0 4px;
+    margin-right: 4px;
+    color: var(--muted);
+  }
 </style>
 </head>
 <body>
@@ -250,8 +448,8 @@
 <div id="vBanner" class="banner" hidden></div>
 <main id="layout">
   <header id="topTabs" aria-label="top view tabs">
-    <span id="viewToggle">
-      <button id="tabLog" data-view="log" aria-pressed="true">로그</button><button id="tabTime" data-view="time" aria-pressed="false">시간순</button>
+    <span id="viewToggle" role="tablist" aria-label="상단 보기 전환">
+      <button id="tabLog" data-view="log" aria-pressed="true" role="tab"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M2 4h12M2 8h12M2 12h7"/></svg>로그</button><button id="tabTime" data-view="time" aria-pressed="false" role="tab"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 1.5"/></svg>시간순</button>
     </span>
   </header>
   <section id="msgPane" aria-label="top views">
@@ -261,16 +459,15 @@
   <div id="divider"></div>
   <section id="agentPane" aria-label="agents">
     <header id="agentHeader">
-      <span>에이전트</span>
+      <span class="title">에이전트</span><span class="count" id="agentCount"></span>
     </header>
     <div id="agentList"></div>
   </section>
 </main>
 <div id="histModal" hidden>
-  <div id="histDlg" role="dialog" aria-label="이력 전체">
-    <div class="mhead" id="histTitle"></div>
+  <div id="histDlg" role="dialog" aria-modal="true" aria-label="이력 전체">
+    <div class="mhead"><span id="histTitle"></span><button id="histClose" aria-label="닫기"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
     <div id="histBody"></div>
-    <button class="hexp" id="histClose">닫기</button>
   </div>
 </div>
 <script>
@@ -296,6 +493,7 @@
 
   var $ = function (id) { return document.getElementById(id); };
   var msgList = $("msgList"), agentList = $("agentList"), timeList = $("timeList");
+  var agentCount = $("agentCount");
   var connBanner = $("connBanner"), staleBanner = $("staleBanner"), vBanner = $("vBanner");
   var tabLogBtn = $("tabLog"), tabTimeBtn = $("tabTime");
 
@@ -469,6 +667,7 @@
   function renderAgents() {
     agentList.textContent = "";
     var list = sortedAgents();
+    agentCount.textContent = list.length + "명";
     list.forEach(function (a) {
       var wrap = document.createElement("div");
       wrap.className = "agent" + (a.status === "blocked" ? " blocked" : "");
@@ -479,27 +678,35 @@
         ? a.tag + "/" + a.name : esc(a.name);
       var who = document.createElement("span");
       who.className = "who";
+      var aname = document.createElement("span");
+      aname.className = "aname";
+      aname.textContent = displayName + (a.unreadCount > 0 ? " (" + a.unreadCount + ")" : "");
+      who.appendChild(aname);
       var abbr = toolAbbr(a.tool);
       if (abbr !== null) {
         var badge = document.createElement("span");
         badge.className = "tool";
         badge.setAttribute("data-tool", esc(a.tool));
         badge.textContent = abbr;
+        badge.title = esc(a.tool);
         who.appendChild(badge);
       }
-      var aname = document.createElement("span");
-      aname.className = "aname";
-      aname.textContent = displayName;
-      who.appendChild(aname);
+      var glyph = document.createElement("span");
+      glyph.className = "sglyph sg-" + esc(a.status);
+      glyph.textContent = statusGlyph(a.status);
+      who.insertBefore(glyph, who.firstChild);
       head.appendChild(who);
       var st = document.createElement("span");
       st.className = "st st-" + esc(a.status);
-      st.textContent = statusGlyph(a.status) + " " + esc(a.status);
+      st.textContent = esc(a.status);
       head.appendChild(st);
       head.setAttribute("data-agent", esc(a.name));
       wrap.appendChild(head);
 
-      if (a.description !== null && a.description !== undefined && a.description !== "") {
+      /* hcom이 description에 상태값을 그대로 내려(head 상태와 중복, 예: "listening")
+         오는 경우에는 그리지 않는다. 실제 설명문은 그대로 둔다. */
+      var descText = esc(a.description).trim();
+      if (descText !== "" && descText.toLowerCase() !== esc(a.status).trim().toLowerCase()) {
         var desc = document.createElement("div");
         desc.className = "desc";
         desc.textContent = esc(a.description);
@@ -509,6 +716,7 @@
       var cur = document.createElement("span");
       cur.className = "cur";
       cur.setAttribute("data-oracle", "current-line");
+      cur.title = combineLine(a.statusContext, a.statusDetail);
       cur.textContent = combineLine(a.statusContext, a.statusDetail);
       wrap.appendChild(cur);
 
@@ -518,8 +726,6 @@
           var hw = document.createElement("div");
           hw.className = "hwrap";
           hw.setAttribute("data-histwrap", esc(nm));
-          hw.setAttribute("role", "button");
-          hw.setAttribute("tabindex", "0");
           var shown = Math.min(HIST_DEFAULT_N, hs.length);
           for (var hi = 0; hi < shown; hi++) {
             var hline = document.createElement("span");
@@ -527,17 +733,13 @@
             hline.textContent = fmtTime(hs[hi].ts) + " " + activityLine(hs[hi]);
             hw.appendChild(hline);
           }
-          if (hs.length > shown) {
-            var more = document.createElement("span");
-            more.className = "hist";
-            more.textContent = "+" + (hs.length - shown) + "건 (눌러서 전체 보기)";
-            hw.appendChild(more);
-          }
-          function open() { openHistModal(nm); }
-          hw.addEventListener("click", open);
-          hw.addEventListener("keydown", function (ev) {
-            if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); open(); }
-          });
+          var moreBtn = document.createElement("button");
+          moreBtn.className = "hexpand";
+          moreBtn.setAttribute("aria-label", nm + " 이력 전체 보기");
+          moreBtn.title = nm + " 이력 전체 보기";
+          moreBtn.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h5v5M14 2L9 7M7 14H2V9M2 14l5-5"/></svg>';
+          moreBtn.addEventListener("click", function () { openHistModal(nm); });
+          hw.appendChild(moreBtn);
           wrap.appendChild(hw);
         })(a.name, hists);
       }
@@ -562,11 +764,16 @@
     acts.forEach(function (a) {
       var row = document.createElement("span");
       row.className = "trow";
+      var kind = document.createElement("span");
+      kind.className = "kind";
+      kind.textContent = esc(a.kind);
+      row.appendChild(kind);
       var tt = document.createElement("span");
       tt.className = "tt";
       tt.textContent = fmtTime(a.ts) + " " + a.agent + " ";
       row.appendChild(tt);
       row.appendChild(document.createTextNode(activityLine(a)));
+      row.title = fmtTime(a.ts) + " " + a.agent + " " + activityLine(a);
       timeList.appendChild(row);
     });
     /* 상단 영역은 #msgPane 스크롤에 맡긴다. 하단 FR-15 max-height와 무관.
@@ -606,6 +813,12 @@
     var hs = modalHistories(name);
     histTitle.textContent = name + " 이력 " + hs.length + "/" + MODAL_HISTORY_MAX;
     histBody.textContent = "";
+    if (hs.length === 0) {
+      var p = document.createElement("div");
+      p.className = "mrow";
+      p.textContent = "이력이 없습니다";
+      histBody.appendChild(p);
+    }
     hs.forEach(function (h) {
       var row = document.createElement("div");
       row.className = "mrow";
@@ -613,6 +826,7 @@
       histBody.appendChild(row);
     });
     histModal.hidden = false;
+    histClose.focus();
   }
   function closeHistModal() { histModal.hidden = true; }
   histClose.addEventListener("click", closeHistModal);
@@ -646,15 +860,47 @@
     wrap.className = "msg";
     var meta = document.createElement("div");
     meta.className = "meta";
-    var to = (m.to && m.to.length) ? " → @" + m.to.join(",@") : "";
-    var intent = (m.intent !== null && m.intent !== undefined) ? "  " + m.intent : "";
-    meta.textContent = "● " + m.from + to + intent + "  " + fmtTime(m.ts);
+    var to = (m.to && m.to.length) ? " → @" + m.to.join(",@") : " → (전체)";
+    var from = document.createTextNode("● " + m.from + to + "  ");
+    meta.appendChild(from);
+    if (m.intent) {
+      var chip = document.createElement("span");
+      chip.className = "intent";
+      chip.textContent = m.intent;
+      meta.appendChild(chip);
+    }
+    var ts = document.createElement("span");
+    ts.className = "ts";
+    ts.textContent = "  " + fmtTime(m.ts);
+    meta.appendChild(ts);
+    var exp = document.createElement("span");
+    exp.className = "exp";
+    exp.setAttribute("aria-hidden", "true");
+    exp.innerHTML = '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>';
+    meta.appendChild(exp);
     var text = document.createElement("div");
     text.className = "text";
     text.textContent = foldBlankLines(esc(m.text));
+    text.title = esc(m.text);
+    /* 펼칠 내용이 있을 때만 아래(말줄임 판정 뒤)에서 role·핸들러를 건다. */
     wrap.appendChild(meta);
     wrap.appendChild(text);
     msgList.appendChild(wrap);
+    if (text.scrollHeight > text.clientHeight + 1) {
+      wrap.classList.add("clamped");
+      meta.setAttribute("role", "button");
+      meta.setAttribute("tabindex", "0");
+      meta.setAttribute("aria-expanded", "false");
+      meta.title = "눌러서 펼치기/접기";
+      meta.addEventListener("click", function () {
+        var on = wrap.classList.toggle("expanded");
+        meta.setAttribute("aria-expanded", on ? "true" : "false");
+        if (stickToBottom) msgPane.scrollTop = msgPane.scrollHeight;
+      });
+      meta.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); meta.click(); }
+      });
+    }
     while (msgList.children.length > BUFFER_MAX) {
       msgList.removeChild(msgList.firstChild);
     }
