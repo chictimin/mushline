@@ -360,7 +360,9 @@
       glyph.className = "st-" + esc(a.status);
       glyph.textContent = statusGlyph(a.status) + " ";
       head.appendChild(glyph);
-      head.appendChild(document.createTextNode(esc(a.name)));
+      var displayName = (a.tag !== null && a.tag !== undefined && a.tag !== "")
+        ? a.tag + "/" + a.name : esc(a.name);
+      head.appendChild(document.createTextNode(displayName));
       head.setAttribute("data-agent", esc(a.name));
       head.addEventListener("click", function () { toggleTerm(a.name); });
       wrap.appendChild(head);
@@ -672,13 +674,13 @@
       snapshot: {
         v: 1, ts: iso,
         agents: [
-          { name: "lune", status: "active", statusContext: "tool:Bash",
+          { name: "lune", tag: "w1", status: "active", statusContext: "tool:Bash",
             statusDetail: "bun run src/server.ts", description: "서버·SSE 담당",
             directory: "/Users/x/mushline", unreadCount: 0, lastEventAt: iso },
-          { name: "nova", status: "blocked", statusContext: "approval",
+          { name: "nova", tag: null, status: "blocked", statusContext: "approval",
             statusDetail: "Bash", description: "프론트 렌더 담당",
             directory: "/Users/x/mushline", unreadCount: 0, lastEventAt: iso },
-          { name: "sona", status: "listening", statusContext: null,
+          { name: "sona", tag: null, status: "listening", statusContext: null,
             statusDetail: null, description: "문서 정리 담당",
             directory: "/Users/x/mushline", unreadCount: 0, lastEventAt: old }
         ]
