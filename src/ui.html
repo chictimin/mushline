@@ -16,13 +16,13 @@
   }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
-    font-size: 11px;
+    font-size: 13px;
     line-height: 1.45;
     color: #e8e8e8;
     background: #141414;
   }
   .banner {
-    font-size: 10px;
+    font-size: 13px;
     line-height: 1.4;
     padding: 3px 6px;
     overflow-wrap: break-word;
@@ -46,19 +46,23 @@
     overflow-y: auto;
     padding: 4px 6px;
   }
-  .msg { margin: 0 0 5px 0; min-width: 0; }
+  .msg { margin: 0 0 6px 0; padding-bottom: 5px; border-bottom: 1px solid #262626; min-width: 0; }
   .msg .meta {
-    font-size: 10px;
+    font-size: 13px;
     color: #9ad;
     overflow-wrap: break-word;
     word-break: break-word;
   }
   .msg .text {
-    font-size: 11px;
+    font-size: 13px;
     color: #e8e8e8;
     overflow-wrap: break-word;
     word-break: break-word;
     white-space: pre-wrap;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
   #divider {
     flex: 0 0 auto;
@@ -70,7 +74,7 @@
     justify-content: flex-start;
     align-items: center;
     padding: 3px 6px;
-    font-size: 10px;
+    font-size: 13px;
     color: #aaa;
     border-bottom: 1px solid #333;
     min-width: 0;
@@ -82,13 +86,13 @@
     justify-content: space-between;
     align-items: center;
     padding: 3px 6px;
-    font-size: 10px;
+    font-size: 13px;
     color: #aaa;
     border-bottom: 1px solid #333;
     min-width: 0;
   }
   #viewToggle button {
-    font-size: 10px;
+    font-size: 13px;
     background: none;
     border: 1px solid #555;
     color: #ccc;
@@ -117,14 +121,41 @@
     border-left: 3px solid #e05353;
   }
   .agent .head {
-    font-size: 11px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 13px;
     font-weight: bold;
-    cursor: pointer;
-    overflow-wrap: break-word;
-    word-break: break-word;
+    min-width: 0;
+  }
+  .agent .aname {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .agent .who {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    min-width: 0;
+  }
+  .agent .tool {
+    flex: none;
+    font-size: 13px;
+    border: 1px solid #555;
+    color: #ccc;
+    padding: 0 4px;
+    white-space: nowrap;
+  }
+  .agent .st {
+    flex: none;
+    font-weight: normal;
+    white-space: nowrap;
   }
   .agent .desc {
-    font-size: 10px;
+    font-size: 13px;
     color: #999;
     overflow-wrap: break-word;
     word-break: break-word;
@@ -132,7 +163,7 @@
   /* O-3 측정 셀. 이 셀에만 ellipsis용 overflow를 둔다. */
   .cur {
     display: block;
-    font-size: 11px;
+    font-size: 13px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -140,34 +171,30 @@
   }
   .hist {
     display: block;
-    font-size: 10px;
+    font-size: 13px;
     color: #bbb;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
   }
+  .hexp {
+    font-size: 13px;
+    background: none;
+    border: 1px solid #555;
+    color: #ccc;
+    padding: 0 6px;
+    margin: 2px 0 0 0;
+    cursor: pointer;
+  }
   .st-active { color: #7dd87d; }
   .st-listening { color: #e0c060; }
   .st-blocked { color: #ff7b7b; }
   .st-inactive { color: #777; }
   .st-unknown { color: #777; }
-  .term {
-    font-size: 10px;
-    white-space: pre-wrap;
-    overflow-wrap: break-word;
-    word-break: break-all;
-    background: #0a0a0a;
-    border: 1px solid #333;
-    padding: 4px;
-    margin: 4px 0 2px 0;
-    max-height: 180px;
-    overflow-y: auto;
-    color: #cfcfcf;
-  }
   .trow {
     display: block;
-    font-size: 10px;
+    font-size: 13px;
     color: #ccc;
     white-space: nowrap;
     overflow: hidden;
@@ -234,7 +261,7 @@
     everConnected: false,
     openedCount: 0,
     vDropped: 0,
-    expandedTerm: {},  /* name -> true */
+    expandedHist: {},  /* name -> true. FR-11: 기본 최신 1건, 펼치면 N=3까지 */
     lastBannerText: null
   };
 
@@ -282,6 +309,18 @@
     if (status === "blocked") return "\u25A0";   /* ■ */
     if (status === "inactive") return "\u25CB";  /* ○ */
     return "?";
+  }
+
+  /* UI 배치 #5: tool 약자 매핑. claude→CC, opencode→OC, codex→CX,
+     그 외 원문 앞 2자 대문자. null/""이면 뱃지 없음. 모델명은 표시하지 않는다. */
+  function toolAbbr(tool) {
+    if (tool === null || tool === undefined || tool === "") return null;
+    var t = String(tool);
+    var low = t.toLowerCase();
+    if (low === "claude") return "CC";
+    if (low === "opencode") return "OC";
+    if (low === "codex") return "CX";
+    return t.slice(0, 2).toUpperCase();
   }
 
   /* --- 배너 --- */
@@ -372,15 +411,28 @@
 
       var head = document.createElement("div");
       head.className = "head";
-      var glyph = document.createElement("span");
-      glyph.className = "st-" + esc(a.status);
-      glyph.textContent = statusGlyph(a.status) + " ";
-      head.appendChild(glyph);
       var displayName = (a.tag !== null && a.tag !== undefined && a.tag !== "")
         ? a.tag + "/" + a.name : esc(a.name);
-      head.appendChild(document.createTextNode(displayName));
+      var who = document.createElement("span");
+      who.className = "who";
+      var abbr = toolAbbr(a.tool);
+      if (abbr !== null) {
+        var badge = document.createElement("span");
+        badge.className = "tool";
+        badge.setAttribute("data-tool", esc(a.tool));
+        badge.textContent = abbr;
+        who.appendChild(badge);
+      }
+      var aname = document.createElement("span");
+      aname.className = "aname";
+      aname.textContent = displayName;
+      who.appendChild(aname);
+      head.appendChild(who);
+      var st = document.createElement("span");
+      st.className = "st st-" + esc(a.status);
+      st.textContent = statusGlyph(a.status) + " " + esc(a.status);
+      head.appendChild(st);
       head.setAttribute("data-agent", esc(a.name));
-      head.addEventListener("click", function () { toggleTerm(a.name); });
       wrap.appendChild(head);
 
       if (a.description !== null && a.description !== undefined && a.description !== "") {
@@ -401,20 +453,32 @@
       t.textContent = fmtTime(a.lastEventAt);
       wrap.appendChild(t);
 
-      historyFor(a.name).forEach(function (h) {
+      var hists = historyFor(a.name);
+      function appendHist(h) {
         var hline = document.createElement("span");
         hline.className = "hist";
         hline.textContent = fmtTime(h.ts) + " " + activityLine(h);
         wrap.appendChild(hline);
-      });
-
-      if (state.expandedTerm[a.name]) {
-        var term = document.createElement("div");
-        term.className = "term";
-        term.setAttribute("data-term", a.name);
-        term.textContent = "불러오는 중…";
-        wrap.appendChild(term);
-        loadTerm(a.name, term);
+      }
+      if (hists.length > 0) appendHist(hists[0]);
+      if (hists.length > 1) {
+        if (state.expandedHist[a.name]) {
+          for (var hi = 1; hi < hists.length; hi++) appendHist(hists[hi]);
+        }
+        (function (nm) {
+          var hexp = document.createElement("button");
+          hexp.className = "hexp";
+          hexp.setAttribute("data-hist", esc(nm));
+          hexp.textContent = state.expandedHist[nm]
+            ? "접기"
+            : "+" + (hists.length - 1) + " 더보기";
+          hexp.addEventListener("click", function () {
+            if (state.expandedHist[nm]) delete state.expandedHist[nm];
+            else state.expandedHist[nm] = true;
+            renderAgents();
+          });
+          wrap.appendChild(hexp);
+        })(a.name);
       }
 
       agentList.appendChild(wrap);
@@ -551,38 +615,6 @@
     if (!checkVersion(ev)) return;
     state.lastHeartbeatAt = Date.now();
     refreshStale();
-  }
-
-  /* --- 터미널 펼치기 (FR-14) --- */
-
-  function toggleTerm(name) {
-    if (state.expandedTerm[name]) {
-      delete state.expandedTerm[name];
-    } else {
-      state.expandedTerm[name] = true;
-    }
-    renderAgents();
-  }
-
-  function loadTerm(name, node) {
-    fetch("/term/" + encodeURIComponent(name) + "?n=20")
-      .then(function (res) {
-        return res.json().then(function (body) {
-          return { status: res.status, body: body };
-        });
-      })
-      .then(function (r) {
-        if (r.status === 200 && r.body && Array.isArray(r.body.lines)) {
-          node.textContent = r.body.lines.join("\n");
-        } else if (r.body && r.body.reason) {
-          node.textContent = "term 오류: " + esc(r.body.error) + " — " + esc(r.body.reason);
-        } else {
-          node.textContent = "term 오류: HTTP " + r.status;
-        }
-      })
-      .catch(function (err) {
-        node.textContent = "term 불러오기 실패: " + String(err && err.message || err);
-      });
   }
 
   /* --- heartbeat 감시 (SCHEMA §3-11) ---
