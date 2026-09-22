@@ -1,0 +1,9 @@
+.DS_Store
+node_modules/
+*.log
+.tmp/
+# 측정 산출물 — 커밋하지 않는다
+measurements/
+*.db
+*.db-wal
+*.db-shm
