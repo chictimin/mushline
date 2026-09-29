@@ -11,6 +11,7 @@
  * 주입 인터페이스 (PRD §7 — 측정 가능성의 전제)
  *   --db-path <path> / HCOM_DB    기본 ~/.hcom/hcom.db
  *   HCOM_BIN                      기본 hcom
+ *   CMUX_BIN                      기본 cmux (선택 — 없으면 cmux 그룹 대신 directory 로 묶는다)
  */
 
 import { Database } from "bun:sqlite";
@@ -31,6 +32,8 @@ const CLI_TIMEOUT_MS = 5000;
 
 const ACTIVITY_BUFFER_MAX = 200; // SCHEMA §3-9
 const MESSAGE_BUFFER_MAX = 200;
+/** 기동 시 메시지 seed 시간 창. 실측 최근 24h 메시지 212건 ≈ 버퍼 상한이라 사실상 하루치다. */
+const MESSAGE_SEED_WINDOW_MS = 24 * 3600 * 1000;
 
 /** 부록 A 순번 2 — 파일쓰기 화이트리스트. 비교는 대소문자 무시다.
  *  구분하면 `tool:write`(OpenCode, 실측 3383건)가 조용히 순번 4로 샌다. */
@@ -55,6 +58,9 @@ interface Agent {
   statusDetail: string | null;
   description: string | null;
   directory: string | null;
+  /** 필터 키. cmux 그룹에 속한 워크스페이스에서 뜬 에이전트는 `cgroup:<그룹 이름>`, 아니면 `dir:<directory>`. 모르면 null. */
+  workspace: string | null;
+  workspaceLabel: string | null;
   unreadCount: number;
   lastEventAt: string | null;
 }
@@ -96,6 +102,7 @@ const DB_PATH =
   process.env.HCOM_DB ??
   join(homedir(), ".hcom", "hcom.db");
 const HCOM_BIN = process.env.HCOM_BIN ?? "hcom";
+const CMUX_BIN = process.env.CMUX_BIN ?? "cmux";
 
 const startedAt = new Date().toISOString();
 let seq = 0;
@@ -312,16 +319,43 @@ function ingest(row: Row, push: boolean) {
   }
 }
 
-/** 기동 직후 버퍼를 채운다. 비어 있으면 FR-11(최근 이력 N줄)이 첫 화면에서 성립하지 않는다. */
-function seedBuffers() {
+/**
+ * 기동 직후 버퍼를 채운다. 비어 있으면 FR-11(최근 이력 N줄)이 첫 화면에서 성립하지 않는다.
+ *
+ * activity 는 **살아 있는 에이전트의 이력만** 싣는다. 전체 최근 200건을 실으면 실측상 발신자 22명 중
+ * 살아 있는 건 2명이라, 첫 화면 대부분이 이미 끝난 에이전트의 로그였다.
+ * 메시지는 보낸 쪽이나 받은 쪽(delivered_to·mentions) 중 하나라도 살아 있거나, **최근 24시간** 안이면
+ * 싣는다. 살아 있는 에이전트끼리 대화가 없으면 로그 탭이 통째로 비기 때문이다.
+ */
+function seedBuffers(alive: Set<string>) {
   if (!db) return;
   try {
-    const acts = db
-      .query(`SELECT ${ROW_COLS} FROM events_v WHERE type != 'message' ORDER BY id DESC LIMIT ${ACTIVITY_BUFFER_MAX}`)
-      .all() as Row[];
+    const names = [...alive];
+    const ph = names.map(() => "?").join(",");
+    const inJson = (col: string) =>
+      `EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(${col}) THEN ${col} ELSE '[]' END) WHERE value IN (${ph}))`;
+    // timestamp 는 ISO 문자열(+00:00)이라 초 단위 접두 비교로 충분하다.
+    const since = new Date(Date.now() - MESSAGE_SEED_WINDOW_MS).toISOString().slice(0, 19);
+    const acts =
+      names.length === 0
+        ? []
+        : (db
+            .query(
+              `SELECT ${ROW_COLS} FROM events_v WHERE type != 'message' AND instance IN (${ph})
+               ORDER BY id DESC LIMIT ${ACTIVITY_BUFFER_MAX}`,
+            )
+            .all(...names) as Row[]);
+    const related =
+      names.length === 0
+        ? ""
+        : ` OR msg_from IN (${ph}) OR ${inJson("msg_delivered_to")} OR ${inJson("msg_mentions")}`;
     const msgs = db
-      .query(`SELECT ${ROW_COLS} FROM events_v WHERE type = 'message' ORDER BY id DESC LIMIT ${MESSAGE_BUFFER_MAX}`)
-      .all() as Row[];
+      .query(
+        `SELECT ${ROW_COLS} FROM events_v WHERE type = 'message'
+           AND (timestamp >= ?${related})
+         ORDER BY id DESC LIMIT ${MESSAGE_BUFFER_MAX}`,
+      )
+      .all(since, ...(names.length === 0 ? [] : [...names, ...names, ...names])) as Row[];
     for (const r of [...acts, ...msgs].sort((a, b) => a.id - b.id)) ingest(r, false);
     const max = db.query("SELECT MAX(id) AS m FROM events_v").get() as { m: number | null };
     lastRowId = max?.m ?? 0;
@@ -363,8 +397,8 @@ function nullable(v: unknown): string | null {
   return typeof v === "string" ? v : null;
 }
 
-async function runCli(args: string[], timeoutMs = CLI_TIMEOUT_MS) {
-  const proc = Bun.spawn([HCOM_BIN, ...args], { stdout: "pipe", stderr: "pipe" });
+async function runCli(args: string[], timeoutMs = CLI_TIMEOUT_MS, bin = HCOM_BIN) {
+  const proc = Bun.spawn([bin, ...args], { stdout: "pipe", stderr: "pipe" });
   const timer = setTimeout(() => proc.kill(), timeoutMs);
   try {
     const [stdout, stderr, code] = await Promise.all([
@@ -390,7 +424,68 @@ function deriveLastEventAt(name: string): string | null {
   return lastEventAt.get(name) ?? null;
 }
 
-function agentsFromCli(raw: unknown[]): Agent[] {
+/**
+ * cmux workspace UUID → 소속 그룹 이름. hcom 은 cmux 에서 뜬 에이전트의 `launch_context.pane_id` 에
+ * workspace UUID 를 싣는다(실측). 그룹 목록은 워크스페이스를 ref(`workspace:N`)로만 주므로
+ * `tree` 의 UUID↔ref 로 잇는다. 워크스페이스 제목은 쓰지 않는다 — 에이전트 상태에 따라 계속 바뀐다.
+ * cmux 는 선택 의존이라 없거나 실패하면 빈 맵이고 health 에 넣지 않는다.
+ */
+async function cmuxGroups(): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  try {
+    const [treeRes, groupRes] = await Promise.all([
+      runCli(["tree", "--json"], CLI_TIMEOUT_MS, CMUX_BIN),
+      runCli(["workspace-group", "list", "--json"], CLI_TIMEOUT_MS, CMUX_BIN),
+    ]);
+    if (treeRes.code !== 0 || groupRes.code !== 0) return out;
+    const tree = JSON.parse(treeRes.stdout) as { windows?: Array<{ workspaces?: Array<Record<string, unknown>> }> };
+    const idOfRef = new Map<string, string>();
+    for (const win of tree.windows ?? []) {
+      for (const ws of win.workspaces ?? []) {
+        const id = nullable(ws.id), ref = nullable(ws.ref);
+        if (id && ref) idOfRef.set(ref, id);
+      }
+    }
+    const groups = JSON.parse(groupRes.stdout) as { groups?: Array<Record<string, unknown>> };
+    for (const g of groups.groups ?? []) {
+      const name = nullable(g.name);
+      if (!name || !Array.isArray(g.member_workspace_refs)) continue;
+      for (const ref of g.member_workspace_refs) {
+        const id = typeof ref === "string" ? idOfRef.get(ref) : undefined;
+        if (id) out.set(id, name);
+      }
+    }
+  } catch {}
+  return out;
+}
+
+const HOME = homedir();
+/** 표시용 경로. 홈은 ~ 로 줄인다. */
+function shortPath(dir: string): string {
+  return dir === HOME || dir.startsWith(HOME + "/") ? "~" + dir.slice(HOME.length) : dir;
+}
+
+function launchPaneId(raw: unknown): string | null {
+  let ctx = raw;
+  if (typeof ctx === "string") {
+    try {
+      ctx = JSON.parse(ctx);
+    } catch {
+      return null;
+    }
+  }
+  return ctx && typeof ctx === "object" ? nullable((ctx as Record<string, unknown>).pane_id) : null;
+}
+
+/** cmux 그룹 우선, 없으면 directory 경로. 둘 다 없으면 미분류(null). */
+function resolveWorkspace(paneId: string | null, directory: string | null, groups: Map<string, string>) {
+  const group = paneId ? groups.get(paneId) : undefined;
+  if (group) return { workspace: `cgroup:${group}`, workspaceLabel: group };
+  if (directory) return { workspace: `dir:${directory}`, workspaceLabel: shortPath(directory) };
+  return { workspace: null, workspaceLabel: null };
+}
+
+function agentsFromCli(raw: unknown[], cmux: Map<string, string>): Agent[] {
   return raw.map((r) => {
     const a = r as Record<string, unknown>;
     // 키는 base_name 이다. events_v.instance 와 같은 값이라야 Activity.agent 가 Agent.name 을 가리킨다.
@@ -404,16 +499,17 @@ function agentsFromCli(raw: unknown[]): Agent[] {
       statusDetail: nullable(a.status_detail),
       description: nullable(a.description),
       directory: nullable(a.directory),
+      ...resolveWorkspace(launchPaneId(a.launch_context), nullable(a.directory), cmux),
       unreadCount: typeof a.unread_count === "number" ? a.unread_count : 0,
       lastEventAt: deriveLastEventAt(name),
     };
   }).filter((a) => a.name.length > 0);
 }
 
-function agentsFromDb(): Agent[] {
+function agentsFromDb(cmux: Map<string, string>): Agent[] {
   if (!db) return [];
   const rows = db
-    .query("SELECT name, tag, tool, status, status_context, status_detail, directory FROM instances")
+    .query("SELECT name, tag, tool, status, status_context, status_detail, directory, launch_context FROM instances")
     .all() as Array<Record<string, unknown>>;
   return rows.map((r) => {
     const name = String(r.name ?? "");
@@ -426,6 +522,7 @@ function agentsFromDb(): Agent[] {
       statusDetail: nullable(r.status_detail),
       description: null, // instances 에는 없다. 모르면 null 이고 지어내지 않는다.
       directory: nullable(r.directory),
+      ...resolveWorkspace(launchPaneId(r.launch_context), nullable(r.directory), cmux),
       unreadCount: 0,
       lastEventAt: deriveLastEventAt(name),
     };
@@ -434,17 +531,18 @@ function agentsFromDb(): Agent[] {
 
 async function pollAgents() {
   let next: Agent[] | null = null;
+  const cmux = await cmuxGroups();
   try {
     const { stdout, stderr, code } = await runCli(["list", "--json"]);
     if (code !== 0) throw new Error(`${HCOM_BIN} list --json exit=${code} ${stderr.trim()}`);
     const parsed = JSON.parse(stdout);
     if (!Array.isArray(parsed)) throw new Error("hcom list --json 이 배열이 아니다");
-    next = agentsFromCli(parsed);
+    next = agentsFromCli(parsed, cmux);
     cliError = null;
   } catch (e) {
     cliError = e instanceof Error ? e.message : String(e);
     // CLI 가 죽어도 화면을 비우지 않는다. 다만 health.ok 는 false 로 남아 배너가 뜬다.
-    next = db ? agentsFromDb() : agents;
+    next = db ? agentsFromDb(cmux) : agents;
   }
 
   const key = JSON.stringify(next);
@@ -588,7 +686,16 @@ async function handle(req: Request): Promise<Response> {
 
 // ── 기동 ────────────────────────────────────────────────────────────────────
 openDb();
-seedBuffers();
+// seed 전에 에이전트를 먼저 받아 "살아 있는" 집합을 만든다. instances 이름을 합치는 것은
+// --db-path 로 사본·픽스처를 볼 때 CLI 목록(실제 hcom)과 DB 가 다르기 때문이다.
+await pollAgents();
+const alive = new Set(agents.map((a) => a.name));
+try {
+  for (const r of (db?.query("SELECT name FROM instances").all() ?? []) as Array<{ name: unknown }>) {
+    if (typeof r.name === "string" && r.name) alive.add(r.name);
+  }
+} catch {}
+seedBuffers(alive);
 recomputeHealth();
 
 try {
@@ -603,7 +710,6 @@ try {
 setInterval(pollDb, POLL_MS);
 setInterval(() => void pollAgents(), AGENT_POLL_MS);
 setInterval(() => broadcast("heartbeat", { v: SCHEMA_V, ts: new Date().toISOString() }), HEARTBEAT_MS);
-void pollAgents();
 
 console.error(
   `[mushline] http://${HOST}:${PORT}  db=${DB_PATH}  hcom=${HCOM_BIN}  startedAt=${startedAt}`,

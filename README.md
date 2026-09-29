@@ -38,6 +38,7 @@ bun run src/server.ts --db-path /tmp/mushline-fixture.db
 |---|---|---|
 | `--db-path` / `HCOM_DB` | `~/.hcom/hcom.db` | Point at a database copy |
 | `HCOM_BIN` | `hcom` | Path to the hcom CLI |
+| `CMUX_BIN` | `cmux` | Optional. Groups agents by cmux workspace group; falls back to directory |
 
 ## Notes
 

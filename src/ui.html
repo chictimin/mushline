@@ -162,6 +162,24 @@
     flex: 0 0 auto;
   }
   #viewToggle { display: flex; gap: 4px; min-width: 0; }
+  #agentHeader .hleft { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  #wsFilter {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 140px;
+    min-height: 24px;
+    font-family: var(--font-body);
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 2px 4px;
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+  #wsFilter:hover { color: var(--fg); }
+  .msg[hidden] { display: none; }
   #viewToggle button {
     display: inline-flex;
     align-items: center;
@@ -366,6 +384,16 @@
   .st-listening { color: var(--warn); }
   .st-blocked { color: var(--danger); }
   .st-inactive, .st-unknown { color: var(--idle); }
+  .agent .dir {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+  }
   .agent .desc {
     font-size: 12px;
     line-height: 1.7;
@@ -459,7 +487,7 @@
   <div id="divider"></div>
   <section id="agentPane" aria-label="agents">
     <header id="agentHeader">
-      <span class="title">Agents</span><span class="count" id="agentCount"></span>
+      <span class="hleft"><span class="title">Agents</span><select id="wsFilter" aria-label="Filter by workspace group" title="Filter by workspace group"><option value="all">All</option></select></span><span class="count" id="agentCount"></span>
     </header>
     <div id="agentList"></div>
   </section>
@@ -490,12 +518,16 @@
   /* FR-10: 상단 탭 선택 영속. 기존 하단 토글 키(mushline.view)를 재사용한다.
      값은 상단 탭에 맞게 log/time. 구 값 agents는 log로 이행한다. */
   var VIEW_KEY = "mushline.view";
+  /* 워크스페이스 필터 선택 영속. 값은 서버 Agent.workspace 키 또는 all. */
+  var WS_KEY = "mushline.ws";
+  var WS_ALL = "all";
 
   var $ = function (id) { return document.getElementById(id); };
   var msgList = $("msgList"), agentList = $("agentList"), timeList = $("timeList");
   var agentCount = $("agentCount");
   var connBanner = $("connBanner"), staleBanner = $("staleBanner"), vBanner = $("vBanner");
   var tabLogBtn = $("tabLog"), tabTimeBtn = $("tabTime");
+  var wsFilter = $("wsFilter");
 
   var state = {
     agents: [],
@@ -510,13 +542,21 @@
     everConnected: false,
     openedCount: 0,
     vDropped: 0,
-    lastBannerText: null
+    lastBannerText: null,
+    ws: WS_ALL,
+    /* 에이전트 이름 → workspace 키. snapshot에서 사라져도 지우지 않는다:
+       끝난 에이전트의 로그도 이 세션 동안은 같은 워크스페이스로 분류된다. */
+    wsOf: new Map(),
+    /* workspace 키 → 마지막으로 본 라벨. */
+    wsLabel: new Map()
   };
 
   try {
     var saved = window.localStorage.getItem(VIEW_KEY);
     if (saved === "log" || saved === "time") state.view = saved;
     else if (saved === "agents") state.view = "log";
+    var savedWs = window.localStorage.getItem(WS_KEY);
+    if (typeof savedWs === "string" && savedWs !== "") state.ws = savedWs;
   } catch (e) { /* localStorage 불가 환경에서는 기본 뷰 */ }
 
   function pad(n) { return (n < 10 ? "0" : "") + n; }
@@ -640,9 +680,85 @@
 
   /* --- 렌더 --- */
 
+  /* --- 워크스페이스 필터 ---
+     미분류(workspace를 모르는 에이전트)는 All에서만 보인다. */
+  function inWs(name) {
+    if (state.ws === WS_ALL) return true;
+    return state.wsOf.get(name) === state.ws;
+  }
+  /* 보낸 쪽·받는 쪽 중 하나라도 선택 워크스페이스면 보인다. 수신자 없는 브로드캐스트는
+     전원에게 배달되므로 어느 워크스페이스에서나 보인다. */
+  function msgVisible(m) {
+    if (state.ws === WS_ALL) return true;
+    if (inWs(m.from)) return true;
+    if (!m.to || m.to.length === 0) return true;
+    for (var i = 0; i < m.to.length; i++) if (inWs(m.to[i])) return true;
+    return false;
+  }
+
+  function renderWsOptions() {
+    var counts = new Map();
+    state.agents.forEach(function (a) {
+      if (a.workspace === null || a.workspace === undefined || a.workspace === "") return;
+      counts.set(a.workspace, (counts.get(a.workspace) || 0) + 1);
+    });
+    var keys = Array.from(counts.keys());
+    /* 선택한 워크스페이스에 지금 에이전트가 없어도 선택은 유지한다(재기동 대기). */
+    if (state.ws !== WS_ALL && keys.indexOf(state.ws) < 0) keys.push(state.ws);
+    keys.sort(function (x, y) {
+      var lx = state.wsLabel.get(x) || x, ly = state.wsLabel.get(y) || y;
+      return lx < ly ? -1 : (lx > ly ? 1 : 0);
+    });
+    var sig = state.ws + "|" + keys.map(function (k) {
+      return k + "=" + (state.wsLabel.get(k) || "") + ":" + (counts.get(k) || 0);
+    }).join("|") + "|" + state.agents.length;
+    if (wsFilter.getAttribute("data-sig") === sig) return;
+    wsFilter.setAttribute("data-sig", sig);
+    wsFilter.textContent = "";
+    var all = document.createElement("option");
+    all.value = WS_ALL;
+    all.textContent = "All (" + state.agents.length + ")";
+    wsFilter.appendChild(all);
+    keys.forEach(function (k) {
+      var o = document.createElement("option");
+      o.value = k;
+      var label = state.wsLabel.get(k) || (k.indexOf("dir:") === 0 ? k.slice(4) : k);
+      o.textContent = label + " (" + (counts.get(k) || 0) + ")";
+      o.title = label;
+      wsFilter.appendChild(o);
+    });
+    wsFilter.value = state.ws;
+  }
+
+  function applyMsgFilter() {
+    var kids = msgList.children;
+    for (var i = 0; i < kids.length; i++) {
+      var m = kids[i]._msg;
+      if (!m) continue;
+      var hide = !msgVisible(m);
+      if (kids[i].hidden !== hide) {
+        kids[i].hidden = hide;
+        if (!hide && !kids[i]._measured) pendingMeasure.push(kids[i]);
+      }
+    }
+  }
+
+  function setWs(k) {
+    state.ws = (typeof k === "string" && k !== "") ? k : WS_ALL;
+    try { window.localStorage.setItem(WS_KEY, state.ws); } catch (e) { /* 무시 */ }
+    renderWsOptions();
+    applyMsgFilter();
+    applyView();
+    renderTimeOnce();
+    flushMeasure();
+    if (stickToBottom) msgPane.scrollTop = msgPane.scrollHeight;
+  }
+  wsFilter.addEventListener("change", function () { setWs(wsFilter.value); });
+
   function sortedAgents() {
     var blocked = [], rest = [];
     state.agents.forEach(function (a) {
+      if (!inWs(a.name)) return;
       if (a.status === "blocked") blocked.push(a);
       else rest.push(a);
     });
@@ -667,7 +783,8 @@
   function renderAgents() {
     agentList.textContent = "";
     var list = sortedAgents();
-    agentCount.textContent = list.length + " agents";
+    agentCount.textContent = (state.ws === WS_ALL ? "" : list.length + "/") +
+      state.agents.length + " agents";
     list.forEach(function (a) {
       var wrap = document.createElement("div");
       wrap.className = "agent" + (a.status === "blocked" ? " blocked" : "");
@@ -702,6 +819,15 @@
       head.appendChild(st);
       head.setAttribute("data-agent", esc(a.name));
       wrap.appendChild(head);
+
+      /* 워크스페이스 경로. 홈은 ~ 로 줄인다. */
+      if (a.directory !== null && a.directory !== undefined && a.directory !== "") {
+        var dir = document.createElement("span");
+        dir.className = "dir";
+        dir.textContent = String(a.directory).replace(/^\/Users\/[^\/]+(?=\/|$)/, "~");
+        dir.title = String(a.directory);
+        wrap.appendChild(dir);
+      }
 
       /* hcom이 description에 상태값을 그대로 내려(head 상태와 중복, 예: "listening")
          오는 경우에는 그리지 않는다. 실제 설명문은 그대로 둔다. */
@@ -758,7 +884,7 @@
 
   function renderTime() {
     timeList.textContent = "";
-    var acts = state.activities.slice().sort(function (x, y) {
+    var acts = state.activities.filter(function (a) { return inWs(a.agent); }).sort(function (x, y) {
       return (x.ts < y.ts ? 1 : (x.ts > y.ts ? -1 : 0));
     });
     acts.forEach(function (a) {
@@ -882,29 +1008,71 @@
     text.className = "text";
     text.textContent = foldBlankLines(esc(m.text));
     text.title = esc(m.text);
-    /* 펼칠 내용이 있을 때만 아래(말줄임 판정 뒤)에서 role·핸들러를 건다. */
     wrap.appendChild(meta);
     wrap.appendChild(text);
+    wrap._msg = { from: m.from, to: m.to };
+    wrap.hidden = !msgVisible(m);
     msgList.appendChild(wrap);
-    if (text.scrollHeight > text.clientHeight + 1) {
-      wrap.classList.add("clamped");
-      meta.setAttribute("role", "button");
-      meta.setAttribute("tabindex", "0");
-      meta.setAttribute("aria-expanded", "false");
-      meta.title = "Click to expand/collapse";
-      meta.addEventListener("click", function () {
-        var on = wrap.classList.toggle("expanded");
-        meta.setAttribute("aria-expanded", on ? "true" : "false");
-        if (stickToBottom) msgPane.scrollTop = msgPane.scrollHeight;
-      });
-      meta.addEventListener("keydown", function (ev) {
-        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); meta.click(); }
-      });
-    }
     while (msgList.children.length > BUFFER_MAX) {
       msgList.removeChild(msgList.firstChild);
     }
+    /* 말줄임 판정(scrollHeight 읽기)은 강제 레이아웃이라 메시지마다 하지 않고
+       다음 프레임에 모아서 한다. 숨은 메시지는 높이가 0이라 보일 때 판정한다. */
+    if (!wrap.hidden) pendingMeasure.push(wrap);
+    scheduleRender();
+  }
+
+  var pendingMeasure = [];
+  function flushMeasure() {
+    if (pendingMeasure.length === 0) return;
+    var batch = pendingMeasure;
+    pendingMeasure = [];
+    /* 읽기를 모두 끝낸 뒤 쓴다(레이아웃 스래싱 방지). */
+    var over = batch.map(function (w) {
+      if (w.hidden || w._measured || !w.parentNode) return false;
+      var t = w.lastChild;
+      return t.scrollHeight > t.clientHeight + 1;
+    });
+    batch.forEach(function (w, i) {
+      if (w.hidden || w._measured || !w.parentNode) return;
+      w._measured = true;
+      if (over[i]) markClamped(w);
+    });
+  }
+
+  /* 펼칠 내용이 있을 때만 role·핸들러를 건다. */
+  function markClamped(wrap) {
+    var meta = wrap.firstChild;
+    wrap.classList.add("clamped");
+    meta.setAttribute("role", "button");
+    meta.setAttribute("tabindex", "0");
+    meta.setAttribute("aria-expanded", "false");
+    meta.title = "Click to expand/collapse";
+    meta.addEventListener("click", function () {
+      var on = wrap.classList.toggle("expanded");
+      meta.setAttribute("aria-expanded", on ? "true" : "false");
+      if (stickToBottom) msgPane.scrollTop = msgPane.scrollHeight;
+    });
+    meta.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); meta.click(); }
+    });
+  }
+
+  /* 렌더 병합: 이벤트마다 전체를 다시 그리지 않고 한 프레임에 한 번만 그린다.
+     접속 직후 backlog 200건이 한꺼번에 들어올 때 전체 재렌더 200회가 1회가 된다. */
+  var renderPending = false;
+  function scheduleRender() {
+    if (renderPending) return;
+    renderPending = true;
+    window.requestAnimationFrame(flushRender);
+  }
+  function flushRender() {
+    renderPending = false;
+    applyView();
+    renderTimeOnce();
+    flushMeasure();
     if (stickToBottom) msgPane.scrollTop = msgPane.scrollHeight;
+    refreshStale();
   }
 
   /* --- 이벤트 처리 --- */
@@ -918,9 +1086,14 @@
     }
     /* SCHEMA §3-5: agents는 전량. 없는 에이전트는 사라진 것으로 교체한다. */
     state.agents = Array.isArray(ev.agents) ? ev.agents : [];
-    applyView();
-    renderTimeOnce();
-    refreshStale();
+    state.agents.forEach(function (a) {
+      if (a.workspace === null || a.workspace === undefined || a.workspace === "") return;
+      state.wsOf.set(a.name, a.workspace);
+      if (a.workspaceLabel) state.wsLabel.set(a.workspace, a.workspaceLabel);
+    });
+    renderWsOptions();
+    applyMsgFilter();
+    scheduleRender();
   }
 
   function onActivity(ev) {
@@ -938,9 +1111,7 @@
       kind: ev.kind, label: ev.label, detail: ev.detail
     });
     while (state.activities.length > BUFFER_MAX) state.activities.shift();
-    applyView();
-    renderTimeOnce();
-    refreshStale();
+    scheduleRender();
   }
 
   function onMessage(ev) {
