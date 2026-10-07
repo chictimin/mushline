@@ -58,7 +58,7 @@ Delete the temp DB before re-seeding: re-running the `sqlite3` import on the sam
 |---|---|---|---|
 | Message stream + agent status | Yes | Yes | Yes (DB rows only) |
 | Workspace group filter | cmux workspace group names | Directory fallback | Directory fallback |
-| Group sections · Attention · collapse | Yes (browser UI state) | Yes | Yes |
+| Group sections · blocked lead · collapse | Yes (browser UI state) | Yes | Yes |
 | Name click → terminal focus | Yes — surface-UUID agents land on the exact tab; workspace-UUID (`cmux` preset) agents land on that workspace's focused pane only | No — names dimmed, `/focus` returns `no_cmux` | No |
 
 Terminal focus for other backends (WezTerm backend, Windows Terminal — no list API) is not supported yet.
@@ -124,14 +124,16 @@ not to a specific tab.
 Names dimmed when not running in cmux do nothing.
 
 With All selected and two or more groups, the list splits into labeled sections —
-Attention (blocked or pinned) first, then groups A–Z with Ungrouped last.
-Attention cards show their group next to the name; blocked cards stop sticking to the top in this mode.
-Group headers are color bands (deterministic per-group color, Ungrouped gray, Attention warning tone) and collapse on click or Enter/Space, remembering the folded state per browser; a folded header shows one summary status icon.
-Sections need All + two or more groups (Ungrouped counts); with no blocked or pinned agents
-there is no Attention section, and a filtered or single-group view stays a plain list.
-Sort OFF keeps strict server order inside sections.
-Folded headers show one summary icon (active ▶ > listening ● > unknown ◦ > inactive ○).
-Attention never folds.
+blocked agents first with no header, then groups A–Z with Ungrouped last.
+Pinned agents stay at the top of their own group section (Sort ON: pinned first,
+then rank; Sort OFF: pinned first, then server order).
+Blocked cards keep their style and show their group next to the name;
+pinned cards carry no group label; blocked cards stop sticking to the top in this mode.
+Group headers are color bands (deterministic per-group color, Ungrouped gray) and collapse on click or Enter/Space, remembering the folded state per browser; a folded header shows one summary status icon.
+Sections need All + two or more groups (Ungrouped counts); with no blocked agents
+there is no lead row, and a filtered or single-group view stays a plain list.
+A pinned card in a folded group is hidden (it no longer moves up).
+Headers never cover the blocked lead row.
 
 ## Notes
 
@@ -151,6 +153,17 @@ Attention never folds.
 - License: MIT.
 
 ## Changelog
+
+### 2026-10-07 (Attention header removed)
+
+- The Attention header band is gone: blocked agents lead the list with no header,
+  keeping their card style and group label. Group bands and collapse unchanged.
+
+### 2026-10-07 (Attention blocked-only)
+
+- Attention holds blocked agents only. Pinned agents stay at the top of
+  their own group section (Sort OFF included) and carry no group label;
+  a pinned card in a folded group stays hidden.
 
 ### 2026-10-07 (group header bands + collapse)
 

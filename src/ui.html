@@ -366,7 +366,7 @@
     white-space: nowrap;
   }
   #agentList .agroup .agsum { flex: none; font-size: 11px; letter-spacing: 0; }
-  /* M5: Attention 카드 head 안 상태 표시 바로 앞 그룹 라벨. muted 11px,
+  /* M5 rev3 R6'/R15': blocked 선두 카드 head 안 상태 표시 바로 앞 그룹 라벨. muted 11px,
      min-width:0 + ellipsis. head가 좁아지면 이름보다 먼저 줄어든다
      (hact는 flex:none이라 상태·핀은 줄지 않는다). */
   .agent .wslabel {
@@ -994,9 +994,9 @@
     if (a.workspace === null || a.workspace === undefined || a.workspace === "") return null;
     return a.workspace;
   }
-  /* M5: Attention 소속 = blocked 또는 pinned. */
+  /* M5 rev3 R2' + R15': blocked는 헤더 없는 선두 행. pinned는 자기 그룹 섹션에 남는다. */
   function isAttention(a) {
-    return a.status === "blocked" || !!state.pins[a.name];
+    return a.status === "blocked";
   }
   /* M5 rev2 R14: 그룹 팔레트. 빨강 계열(blocked/에러와 혼동) 제외 10색, 바(실선) 색.
      배경은 바 색 12% + 다크 베이스(#1c1e26) 88% 혼합 불투명 틴트 —
@@ -1008,8 +1008,6 @@
   var GROUP_TINT_Q = 0.12;
   var UNGROUPED_BAR = "#8a8a8a";
   var UNGROUPED_BG = "rgb(35, 37, 44)";
-  var ATTENTION_BG = "#241f2b";
-  var ATTENTION_BAR = "#e05353";
   /* M5 rev2 R14: 섹션 키의 결정적 해시(djb2) → 팔레트 인덱스.
      리로드·재정렬과 무관하게 같은 키는 같은 색. */
   function groupColorIdx(key) {
@@ -1039,7 +1037,7 @@
   }
   /* M5 rev2 R18: 접힌 헤더 대표 상태 1개.
      active ▶ > listening ● > unknown ◦ > inactive ○.
-     blocked는 Attention에 있어 그룹에 없다. */
+     blocked는 선두에 있어 그룹에 없다. */
   function groupSummaryOf(members) {
     var hasL = false, hasU = false;
     for (var i = 0; i < members.length; i++) {
@@ -1057,10 +1055,12 @@
     return (k === null || k === undefined) ? "" : k;
   }
   function isCollapsed(k) {
+    /* R15': blocked 선두("@attention")는 접히지 않아 항상 표시. */
     if (k === "@attention") return false;
     return !!state.collapsed[collapseStoreKey(k)];
   }
   function toggleCollapse(storeKey, restore) {
+    /* R15': Attention 헤더가 없어 도달하지 않는 가드. */
     if (storeKey === "@attention") return;
     if (state.collapsed[storeKey]) delete state.collapsed[storeKey];
     else state.collapsed[storeKey] = true;
@@ -1069,7 +1069,7 @@
     renderAgents(true);
     /* M5 rev2 R20: 키보드 토글에 한해 같은 키 헤더로 포커스 복원.
        클릭 토글은 복원하지 않는다 — 복원된 포커스가 hold를 만들어
-       접힌 섹션 카드의 Attention 이동(R19)을 보류에 가두기 때문이다. */
+       접힌 섹션 카드의 blocked 선두 이동(R19/R19')을 보류에 가두기 때문이다. */
     if (!restore) return;
     var heads = agentList.querySelectorAll(".agroup");
     for (var i = 0; i < heads.length; i++) {
@@ -1079,21 +1079,13 @@
       }
     }
   }
-  /* M5 rev2 R13/R15/R16/R18: 섹션 헤더 생성. Attention은 경고 톤·접기 없음.
+  /* M5 rev2 R13/R16/R18 + rev3 R15': 그룹 섹션 헤더 생성(Attention 헤더 없음).
      그룹·Ungrouped는 role=button + 셰브론 + 접기, 접힌 헤더에만 대표 아이콘 1개.
      전부 textContent(esc()는 HTML 이스케이프가 아니다). */
   function buildSectionHeader(s) {
     var h = document.createElement("div");
     h.className = "agroup";
     var labelText = s.label + " · " + s.members.length;
-    if (s.key === "@attention") {
-      h.setAttribute("data-skey", "@attention");
-      h.textContent = labelText;
-      h.title = labelText;
-      h.style.backgroundColor = ATTENTION_BG;
-      h.style.borderLeftColor = ATTENTION_BAR;
-      return h;
-    }
     var sk = collapseStoreKey(s.key);
     h.setAttribute("data-skey", sk);
     h.style.backgroundColor = groupBgFor(s.key);
@@ -1254,11 +1246,23 @@
     return combineLine("tool:" + a.label, a.detail);
   }
 
-  /* M5: 섹션 구성. Attention(blocked 또는 pinned, 0명이면 없음) +
-     그룹 섹션(미분류 포함, 표시 라벨 대소문자 무시 정렬, 미분류 맨 끝).
-     필터=All이고 그룹 섹션이 2개 이상일 때만 섹션 모드, 아니면 단일 리스트.
-     Sort OFF 섹션 안은 엄격 서버 순서(blocked/pinned float 없음).
-     단일 모드는 기존 sortedAgents 규칙 그대로. */
+  /* M5 rev3 R4': 섹션 모드 그룹 안 Sort OFF = pinned 먼저(서버 순서 유지),
+     그다음 나머지 서버 순서. Sort ON은 sortMembers(blocked가 그룹에 없어
+     agentRank pinned=1이 맨 위). */
+  function pinnedFirstServerOrder(members) {
+    var p = [], r = [];
+    members.forEach(function (a) {
+      if (state.pins[a.name]) p.push(a);
+      else r.push(a);
+    });
+    return p.concat(r);
+  }
+  /* M5 rev3 + R15': 섹션 구성. blocked 카드(0명이면 없음)는 헤더 없이
+     리스트 맨 앞. 그다음 그룹 섹션(미분류 포함, 표시 라벨 대소문자 무시
+     정렬, 미분류 맨 끝). pinned는 자기 그룹 섹션 안 맨 위(ON: agentRank
+     선두 / OFF: pinned-first). 필터=All이고 그룹 섹션이 2개 이상일 때만
+     섹션 모드, 아니면 단일 리스트.
+     단일 모드는 기존 sortedAgents 규칙(blocked → pinned → ...) 그대로. */
   function computeSections() {
     var vis = [];
     state.agents.forEach(function (a) {
@@ -1276,33 +1280,30 @@
       byKey.get(k).push(a);
     });
     var sectionsMode = (state.ws === WS_ALL) && (order.length >= 2);
-    var sections = [];
+    var sections = [], attention = [];
     if (sectionsMode) {
-      if (att.length > 0) {
-        sections.push({
-          key: "@attention", label: "Attention",
-          members: state.sortOn ? sortMembers(att.slice()) : att
-        });
-      }
+      /* R15': blocked 카드는 헤더 없는 선두 행. Sort ON이면 정렬, OFF면 서버 순서. */
+      attention = state.sortOn ? sortMembers(att.slice()) : att;
       order.sort(cmpGroupKey);
       order.forEach(function (k) {
         var members = byKey.get(k);
         sections.push({
           key: k,
           label: (k === null) ? "Ungrouped" : wsDisplayLabel(k),
-          members: state.sortOn ? sortMembers(members.slice()) : members
+          members: state.sortOn ? sortMembers(members.slice()) : pinnedFirstServerOrder(members)
         });
       });
     }
     return {
       mode: sectionsMode ? "sections" : "single",
       sections: sections,
+      attention: attention,
       single: sectionsMode ? null : sortedAgents()
     };
   }
 
-  /* M5: Attention 카드 head 안 상태 표시 바로 앞 그룹 라벨(R2 표시 라벨).
-     textContent로만 넣는다(esc()는 HTML 이스케이프가 아니다).
+  /* M5 rev3 R6' + R15': blocked 선두 카드 head 안 상태 표시 바로 앞 그룹 라벨.
+     pinned는 자기 섹션에 있어 라벨 없음. textContent로만 넣는다.
      label이 null이면 제거(섹션 이동 시 라벨 제거). */
   function syncWsLabel(wrap, label) {
     if (label === null || label === undefined) {
@@ -1340,7 +1341,8 @@
     var plan = computeSections();
     var list;
     if (plan.mode === "sections") {
-      list = [];
+      /* R15': blocked 선두(헤더 없음) + 그룹 섹션 순서. */
+      list = plan.attention.concat([]);
       plan.sections.forEach(function (s) {
         s.members.forEach(function (m) { list.push(m); });
       });
@@ -1356,23 +1358,22 @@
     /* M3 rework B: hold 중 메시지 전용 렌더는 카드 렌더를 건너뛰고 orderPending만 유지. */
     if (!explicit && !state.agentsDirty && state.holdOrder) return;
     var reorder = explicit || !state.holdOrder;
-    /* M5: 이름 → Attention 표시 라벨. 섹션 모드 Attention 소속만, 아니면 null.
+    /* M5 rev3 R6' + R15': 이름 → blocked 선두 카드 표시 라벨. 아니면 null.
        보류 중에도 내용 갱신은 즉시(섹션 이동·헤더만 보류)라 새 소속 기준으로 둔다. */
     var attLabelOf = Object.create(null);
     if (plan.mode === "sections") {
-      plan.sections.forEach(function (s) {
-        if (s.key !== "@attention") return;
-        s.members.forEach(function (a) {
-          var k = groupKeyOf(a);
-          attLabelOf[a.name] = (k === null) ? "Ungrouped" : wsDisplayLabel(k);
-        });
+      plan.attention.forEach(function (a) {
+        var k = groupKeyOf(a);
+        attLabelOf[a.name] = (k === null) ? "Ungrouped" : wsDisplayLabel(k);
       });
     }
     var seen = Object.create(null);
     /* M5 rev2: 이름 → 소속 섹션 키. 접힌 섹션 카드는 hidden(DOM 유지,
-       카드 노드 재사용·M4 리스너 보존). */
+       카드 노드 재사용·M4 리스너 보존). blocked 선두는 "@attention" 취급 —
+       접히지 않아 항상 표시. */
     var secOf = Object.create(null);
     if (plan.mode === "sections") {
+      plan.attention.forEach(function (a) { secOf[a.name] = "@attention"; });
       plan.sections.forEach(function (s) {
         s.members.forEach(function (a) { secOf[a.name] = s.key; });
       });
@@ -1389,9 +1390,9 @@
         updateAgentCard(el, a);
       }
       syncWsLabel(el, attLabelOf[a.name] || null);
-      /* M5 rev2 R19: 소속은 새 state 기준(내용 갱신은 즉시)이나,
+      /* M5 rev2 R19 / rev3 R19': 소속은 새 state 기준(내용 갱신은 즉시)이나,
          보류 중에는 기존 카드의 숨김을 손대지 않고 이동만 보류(R9).
-         신규 카드는 소속대로 둔다. */
+         신규 카드는 소속대로 둔다. rev3에서 pinned는 그룹에 남아 접히면 숨겨진다. */
       var wantHidden = (plan.mode === "sections") ? isCollapsed(secOf[a.name]) : false;
       if (!el.parentNode) {
         el.hidden = wantHidden;
