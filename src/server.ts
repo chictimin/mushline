@@ -63,6 +63,8 @@ interface Agent {
   workspaceLabel: string | null;
   unreadCount: number;
   lastEventAt: string | null;
+  /** R6. pane_id 가 직전 poll 의 tree 에 surface 또는 workspace 로 있으면 true. */
+  focusable: boolean;
 }
 interface Activity {
   id: string;
@@ -397,8 +399,17 @@ function nullable(v: unknown): string | null {
   return typeof v === "string" ? v : null;
 }
 
-async function runCli(args: string[], timeoutMs = CLI_TIMEOUT_MS, bin = HCOM_BIN) {
-  const proc = Bun.spawn([bin, ...args], { stdout: "pipe", stderr: "pipe" });
+async function runCli(
+  args: string[],
+  timeoutMs = CLI_TIMEOUT_MS,
+  bin = HCOM_BIN,
+  env?: Record<string, string | undefined>,
+) {
+  const proc = Bun.spawn([bin, ...args], {
+    stdout: "pipe",
+    stderr: "pipe",
+    ...(env !== undefined ? { env } : {}),
+  });
   const timer = setTimeout(() => proc.kill(), timeoutMs);
   try {
     const [stdout, stderr, code] = await Promise.all([
@@ -410,6 +421,24 @@ async function runCli(args: string[], timeoutMs = CLI_TIMEOUT_MS, bin = HCOM_BIN
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * M4 fix: 포커스 4단계 전용 cmux 실행. 호출자 셸의 CMUX_* 범위 env
+ * (CMUX_WORKSPACE_ID/SURFACE_ID/PANEL_ID)를 제거하고 실행해 서버를 띄운
+ * 창 문맥에 의존하지 않는다. tree/workspace-group 조회는 호출자 창 범위가
+ * 결과 자체라(M3 동작 보존) 기존 env를 유지하고, 포커스 4단계에만 적용한다.
+ */
+function strippedCmuxEnv(): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = { ...process.env };
+  delete env.CMUX_WORKSPACE_ID;
+  delete env.CMUX_SURFACE_ID;
+  delete env.CMUX_PANEL_ID;
+  return env;
+}
+
+async function runCmuxFocusStep(args: string[]) {
+  return runCli(args, CLI_TIMEOUT_MS, CMUX_BIN, strippedCmuxEnv());
 }
 
 /**
@@ -433,15 +462,29 @@ function deriveLastEventAt(name: string): string | null {
  * 맵에서 제외한다. 같은 그룹 안에서의 중복은 유지한다.
  * 워크스페이스 제목은 쓰지 않는다 — 에이전트 상태에 따라 계속 바뀐다.
  * cmux 는 선택 의존이라 없거나 실패하면 빈 맵이고 health 에 넣지 않는다.
+ * 덤으로 tree 안의 surface·workspace id 집합도 같이 낸다(R6 focusable 근거).
  */
-async function cmuxGroups(): Promise<Map<string, string>> {
+/** cmux tree 1회 읽기의 결과. focusable(R6)과 /focus 해석(R2)이 함께 쓴다. */
+interface CmuxSnap {
+  groups: Map<string, string>;
+  surfaces: Set<string>;
+  workspaces: Set<string>;
+}
+
+/** /focus 해석용. 이름 → launch_context.pane_id. pollAgents 가 전량 갱신한다. */
+let agentPaneIds = new Map<string, string | null>();
+
+async function cmuxSnapshot(): Promise<CmuxSnap> {
   const out = new Map<string, string>();
+  const surfaces = new Set<string>();
+  const workspaces = new Set<string>();
+  const snap = (): CmuxSnap => ({ groups: out, surfaces, workspaces });
   try {
     const [treeRes, groupRes] = await Promise.all([
       runCli(["--id-format", "both", "tree", "--all", "--json"], CLI_TIMEOUT_MS, CMUX_BIN),
       runCli(["workspace-group", "list", "--json"], CLI_TIMEOUT_MS, CMUX_BIN),
     ]);
-    if (treeRes.code !== 0 || groupRes.code !== 0) return out;
+    if (treeRes.code !== 0 || groupRes.code !== 0) return snap();
     const tree = JSON.parse(treeRes.stdout) as { windows?: Array<{ workspaces?: Array<Record<string, unknown>> }> };
     const idOfRef = new Map<string, string>();
     const wsById = new Map<string, Record<string, unknown>>();
@@ -449,7 +492,19 @@ async function cmuxGroups(): Promise<Map<string, string>> {
       for (const ws of win.workspaces ?? []) {
         const id = nullable(ws.id), ref = nullable(ws.ref);
         if (id && ref) idOfRef.set(ref, id);
-        if (id) wsById.set(id, ws);
+        if (id) {
+          wsById.set(id, ws);
+          workspaces.add(id);
+        }
+        if (ws && Array.isArray(ws.panes)) {
+          for (const pane of ws.panes as Array<Record<string, unknown>>) {
+            if (!pane || !Array.isArray(pane.surfaces)) continue;
+            for (const s of pane.surfaces as Array<Record<string, unknown>>) {
+              const sid = nullable(s.id);
+              if (sid) surfaces.add(sid);
+            }
+          }
+        }
       }
     }
     const groups = JSON.parse(groupRes.stdout) as { groups?: Array<Record<string, unknown>> };
@@ -491,7 +546,7 @@ async function cmuxGroups(): Promise<Map<string, string>> {
       }
     }
   } catch {}
-  return out;
+  return snap();
 }
 
 const HOME = homedir();
@@ -520,11 +575,19 @@ function resolveWorkspace(paneId: string | null, directory: string | null, group
   return { workspace: null, workspaceLabel: null };
 }
 
-function agentsFromCli(raw: unknown[], cmux: Map<string, string>): Agent[] {
-  return raw.map((r) => {
+/** R6. pane_id 가 직전 poll 의 tree 에 surface 또는 workspace 로 있으면 true. */
+function isFocusable(paneId: string | null, cmux: CmuxSnap): boolean {
+  return paneId !== null && (cmux.surfaces.has(paneId) || cmux.workspaces.has(paneId));
+}
+
+function agentsFromCli(raw: unknown[], cmux: CmuxSnap): Agent[] {
+  const paneIds = new Map<string, string | null>();
+  const list = raw.map((r) => {
     const a = r as Record<string, unknown>;
     // 키는 base_name 이다. events_v.instance 와 같은 값이라야 Activity.agent 가 Agent.name 을 가리킨다.
     const name = (nullable(a.base_name) ?? nullable(a.name) ?? "").trim();
+    const pid = launchPaneId(a.launch_context);
+    if (name.length > 0) paneIds.set(name, pid);
     return {
       name,
       tag: nullable(a.tag),
@@ -534,14 +597,17 @@ function agentsFromCli(raw: unknown[], cmux: Map<string, string>): Agent[] {
       statusDetail: nullable(a.status_detail),
       description: nullable(a.description),
       directory: nullable(a.directory),
-      ...resolveWorkspace(launchPaneId(a.launch_context), nullable(a.directory), cmux),
+      ...resolveWorkspace(pid, nullable(a.directory), cmux.groups),
       unreadCount: typeof a.unread_count === "number" ? a.unread_count : 0,
       lastEventAt: deriveLastEventAt(name),
+      focusable: isFocusable(pid, cmux),
     };
   }).filter((a) => a.name.length > 0);
+  agentPaneIds = paneIds;
+  return list;
 }
 
-function agentsFromDb(cmux: Map<string, string>): Agent[] {
+function agentsFromDb(cmux: CmuxSnap): Agent[] {
   if (!db) return [];
   let rows: Array<Record<string, unknown>>;
   try {
@@ -554,8 +620,11 @@ function agentsFromDb(cmux: Map<string, string>): Agent[] {
       .query("SELECT name, tag, tool, status, status_context, status_detail, directory FROM instances")
       .all() as Array<Record<string, unknown>>;
   }
-  return rows.map((r) => {
+  const paneIds = new Map<string, string | null>();
+  const list = rows.map((r) => {
     const name = String(r.name ?? "");
+    const pid = launchPaneId(r.launch_context);
+    if (name.length > 0) paneIds.set(name, pid);
     return {
       name,
       tag: nullable(r.tag),
@@ -565,16 +634,19 @@ function agentsFromDb(cmux: Map<string, string>): Agent[] {
       statusDetail: nullable(r.status_detail),
       description: null, // instances 에는 없다. 모르면 null 이고 지어내지 않는다.
       directory: nullable(r.directory),
-      ...resolveWorkspace(launchPaneId(r.launch_context), nullable(r.directory), cmux),
+      ...resolveWorkspace(pid, nullable(r.directory), cmux.groups),
       unreadCount: 0,
       lastEventAt: deriveLastEventAt(name),
+      focusable: isFocusable(pid, cmux),
     };
   }).filter((a) => a.name.length > 0);
+  agentPaneIds = paneIds;
+  return list;
 }
 
 async function pollAgents() {
   let next: Agent[] | null = null;
-  const cmux = await cmuxGroups();
+  const cmux = await cmuxSnapshot();
   try {
     const { stdout, stderr, code } = await runCli(["list", "--json"]);
     if (code !== 0) throw new Error(`${HCOM_BIN} list --json exit=${code} ${stderr.trim()}`);
@@ -606,6 +678,324 @@ async function pollAgents() {
     broadcast("snapshot", snapshotPayload());
   }
   recomputeHealth();
+}
+
+// ── POST /focus (M4: 카드 이름 클릭 → cmux 터미널 포커스) ───────────────────
+// 읽기 전용 원칙의 예외는 cmux UI 포커스뿐이다. hcom DB 에는 쓰지 않는다.
+// cmux 에 순수 surface 선택 명령은 없다(0.64.25 기준). reorder-surface 의 no-op
+// 용법(--focus true, 위치 지정은 index 가 아니라 이웃 id)으로 선택한다.
+const FOCUS_BODY_MAX = 1024; // R4(e). 바이트 기준.
+const FOCUS_WAIT_MS = 10_000; // R5. 뮤텍스 대기 상한. 초과 시 503 busy.
+
+/** R5. /focus 직렬화용 줄. 절대 reject 되지 않는다(release 호출로만 해소). */
+let focusTail: Promise<void> = Promise.resolve();
+
+/** 줄을 서서 차례를 기다린다. 대기 상한을 넘기면 줄에서 빠져 null 을 낸다. */
+function acquireFocusSlot(waitMs: number): Promise<(() => void) | null> {
+  let release!: () => void;
+  const turn = new Promise<void>((res) => {
+    release = res;
+  });
+  const prev = focusTail;
+  focusTail = prev.then(() => turn);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((res) => {
+    timer = setTimeout(() => res(null), waitMs);
+  });
+  return Promise.race([
+    prev.then(() => {
+      if (timer !== undefined) clearTimeout(timer);
+      return release;
+    }),
+    timeout,
+  ]).then((v) => {
+    if (v === null) release(); // 차례가 와도 쓰지 않으므로 줄을 비운다
+    return v;
+  });
+}
+
+/** 본문을 상한까지만 읽는다. 초과하면 null. */
+async function readCappedBody(req: Request, limit: number): Promise<Uint8Array | null> {
+  if (!req.body) return new Uint8Array(0);
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) {
+      total += value.byteLength;
+      if (total > limit) {
+        try {
+          await reader.cancel();
+        } catch {}
+        return null;
+      }
+      chunks.push(value);
+    }
+  }
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) {
+    out.set(c, off);
+    off += c.byteLength;
+  }
+  return out;
+}
+
+interface SurfaceHit {
+  win: string;
+  ws: string;
+  pane: string;
+  /** 그 pane 의 surface id 순서(pre-tree 비교 기준). 같은 배열 참조를 공유한다. */
+  ids: string[];
+  selected: boolean;
+}
+interface WsHit {
+  win: string;
+  selected: boolean;
+  /** 그 workspace 의 focused pane. 없으면( pane 0개 포함) null. */
+  pane: string | null;
+}
+interface FocusIndex {
+  surfaces: Map<string, SurfaceHit>;
+  workspaces: Map<string, WsHit>;
+  panes: Map<string, string[]>;
+  active: { window: string; workspace: string; pane: string; surface: string } | null;
+}
+
+/** tree 1회 읽기. cmux 부재·실패·파싱 실패는 null. */
+async function readFocusTree(): Promise<FocusIndex | null> {
+  let res: { stdout: string; stderr: string; code: number };
+  try {
+    res = await runCli(["--id-format", "both", "tree", "--all", "--json"], CLI_TIMEOUT_MS, CMUX_BIN);
+  } catch {
+    return null; // CMUX_BIN 미존재(Bun.spawn throw) → no_cmux 경로로 합류 (R5)
+  }
+  if (res.code !== 0) return null;
+  try {
+    const tree = JSON.parse(res.stdout) as Record<string, unknown>;
+    const surfaces = new Map<string, SurfaceHit>();
+    const workspaces = new Map<string, WsHit>();
+    const panes = new Map<string, string[]>();
+    const wins = Array.isArray(tree.windows) ? (tree.windows as Array<Record<string, unknown>>) : [];
+    for (const w of wins) {
+      const winId = nullable(w.id);
+      if (!winId) continue;
+      const wss = Array.isArray(w.workspaces) ? (w.workspaces as Array<Record<string, unknown>>) : [];
+      for (const ws of wss) {
+        const wsId = nullable(ws.id);
+        if (!wsId) continue;
+        let focusedPane: string | null = null;
+        const ps = Array.isArray(ws.panes) ? (ws.panes as Array<Record<string, unknown>>) : [];
+        for (const p of ps) {
+          const paneId = nullable(p.id);
+          if (!paneId) continue;
+          if (p.focused === true && focusedPane === null) focusedPane = paneId;
+          const ss = Array.isArray(p.surfaces) ? (p.surfaces as Array<Record<string, unknown>>) : [];
+          const ids: string[] = [];
+          for (const s of ss) {
+            const sid = nullable(s.id);
+            if (!sid) continue;
+            ids.push(sid);
+            surfaces.set(sid, { win: winId, ws: wsId, pane: paneId, ids, selected: s.selected === true });
+          }
+          panes.set(paneId, ids);
+        }
+        workspaces.set(wsId, { win: winId, selected: ws.selected === true, pane: focusedPane });
+      }
+    }
+    let active: FocusIndex["active"] = null;
+    const raw = tree.active as Record<string, unknown> | null | undefined;
+    if (raw && typeof raw === "object") {
+      const window = nullable(raw.window_id), workspace = nullable(raw.workspace_id);
+      const pane = nullable(raw.pane_id), surface = nullable(raw.surface_id);
+      if (window && workspace && pane && surface) active = { window, workspace, pane, surface };
+    }
+    return { surfaces, workspaces, panes, active };
+  } catch {
+    return null;
+  }
+}
+
+function sameIdSeq(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+/** 서버 메모리 agents 에 이름이 있으면 pane_id, 없으면 undefined. */
+function lookupPaneId(name: string): string | null | undefined {
+  if (!agents.some((a) => a.name === name)) return undefined;
+  return agentPaneIds.get(name) ?? null;
+}
+
+async function handleFocus(req: Request): Promise<Response> {
+  const json = (body: unknown, status: number) =>
+    new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+
+  // R4(a). Host 검사. 누락(HTTP/1.0 무Host 포함)도 거부.
+  const host = req.headers.get("host");
+  if (host !== `127.0.0.1:${PORT}` && host !== `localhost:${PORT}`) {
+    return json({ ok: false, reason: "forbidden" }, 403);
+  }
+  // R4(b). POST 만. 그 외 405 + Allow.
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ ok: false, reason: "method_not_allowed" }), {
+      status: 405,
+      headers: { "content-type": "application/json", Allow: "POST" },
+    });
+  }
+  // R4(c). essence(대소문자 무시, `;` 이후 무시)가 application/json.
+  const essence = (req.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
+  if (essence !== "application/json") {
+    return json({ ok: false, reason: "unsupported_media_type" }, 415);
+  }
+  // R4(d). Origin 이 있으면 자기 origin 만. 없고 Sec-Fetch-Site 가 cross-site 면 거부.
+  // 둘 다 없으면 허용 — JSON POST 에 Origin 을 보내는 현대 브라우저를 가정하고
+  // both-missing 은 로컬 curl 디버깅용이다(로컬 프로세스 남용은 threat model 밖).
+  const origin = req.headers.get("origin");
+  if (origin !== null) {
+    if (origin !== `http://127.0.0.1:${PORT}` && origin !== `http://localhost:${PORT}`) {
+      return json({ ok: false, reason: "forbidden" }, 403);
+    }
+  } else {
+    const sfs = req.headers.get("sec-fetch-site");
+    if (sfs !== null && sfs.toLowerCase() === "cross-site") {
+      return json({ ok: false, reason: "forbidden" }, 403);
+    }
+  }
+  // R4(e). Content-Length 선검사 + 상한까지만 읽기. 바이트 기준.
+  const cl = req.headers.get("content-length");
+  if (cl !== null && cl !== "" && (!/^\d+$/.test(cl.trim()) || Number(cl) > FOCUS_BODY_MAX)) {
+    return json({ ok: false, reason: "body_too_large" }, 413);
+  }
+  const rawBody = await readCappedBody(req, FOCUS_BODY_MAX);
+  if (rawBody === null) return json({ ok: false, reason: "body_too_large" }, 413);
+  // R4(f). 파싱 실패 또는 name 비문자열 → 400.
+  let name: unknown;
+  try {
+    const parsed: unknown = JSON.parse(new TextDecoder().decode(rawBody));
+    name =
+      parsed !== null && typeof parsed === "object"
+        ? (parsed as Record<string, unknown>).name
+        : undefined;
+  } catch {
+    return json({ ok: false, reason: "bad_json" }, 400);
+  }
+  if (typeof name !== "string") return json({ ok: false, reason: "bad_json" }, 400);
+
+  // R5. 동시 요청은 대기-큐로 직렬화. 10초 초과 시 503 busy.
+  const slot = await acquireFocusSlot(FOCUS_WAIT_MS);
+  if (!slot) return json({ ok: false, reason: "busy" }, 503);
+  try {
+    return await runFocusForName(name, json);
+  } catch (e) {
+    console.error(`[mushline] /focus 내부 오류: ${e instanceof Error ? e.message : String(e)}`);
+    return json({ ok: false, reason: "internal" }, 200);
+  } finally {
+    slot();
+  }
+}
+
+async function runFocusForName(
+  name: string,
+  json: (body: unknown, status: number) => Response,
+): Promise<Response> {
+  // R2. 해석은 서버가 한다. 매핑 실패 시 pollAgents 1회 즉시 재수행 후 1회만 재시도.
+  let paneId = lookupPaneId(name);
+  if (paneId === undefined || paneId === null) {
+    await pollAgents();
+    paneId = lookupPaneId(name);
+  }
+  // R4(g). 재시도 후에도 없으면 404.
+  if (paneId === undefined) return json({ ok: false, reason: "unknown_agent" }, 404);
+  if (paneId === null) return json({ ok: false, reason: "not_in_cmux" }, 200);
+
+  // R4(h). cmux 인자는 아래 pre-tree 에서 얻은 값만 쓴다. 요청 문자열은 인자로 쓰지 않는다.
+  const pre = await readFocusTree();
+  if (!pre) return json({ ok: false, reason: "no_cmux" }, 200);
+  const surf = pre.surfaces.get(paneId);
+  const wsHit = surf === undefined ? pre.workspaces.get(paneId) : undefined;
+  if (surf === undefined && wsHit === undefined) return json({ ok: false, reason: "not_in_cmux" }, 200);
+
+  let win: string;
+  let ws: string;
+  let pane: string;
+  let targetSurface: string | null = null;
+  let surfIds: string[] | null = null;
+  if (surf !== undefined) {
+    win = surf.win;
+    ws = surf.ws;
+    pane = surf.pane;
+    targetSurface = paneId;
+    surfIds = surf.ids;
+  } else {
+    win = wsHit!.win;
+    ws = paneId;
+    if (wsHit!.pane === null) return json({ ok: false, reason: "not_in_cmux" }, 200);
+    pane = wsHit!.pane;
+  }
+
+  // R3 fast-path. surface 경로이고 pre-tree 의 active 경로(window/workspace/pane/
+  // surface)가 대상과 모두 같으면 cmux 명령 0건으로 ok. workspace 경로는 pane 에
+  // surface 가 1개여도 선택 단계가 멱등이라 항상 실행한다(V5: 각 1회 + reorder 0건).
+  const act = pre.active;
+  if (
+    targetSurface !== null &&
+    act &&
+    act.window === win &&
+    act.workspace === ws &&
+    act.pane === pane &&
+    act.surface === targetSurface
+  ) {
+    return json({ ok: true, reason: null }, 200);
+  }
+
+  // R3 실행. 순서: focus-window → select-workspace → focus-pane → reorder-surface.
+  // reorder 는 surface 경로이고 그 pane 에 surface 가 2개 이상일 때만. 위치 지정은
+  // index 가 아니라 이웃 id(바로 앞 있으면 --after, 없으면 --before).
+  const steps: Array<{ stage: string; args: string[] }> = [
+    { stage: "focus-window", args: ["focus-window", "--window", win] },
+    { stage: "select-workspace", args: ["select-workspace", "--workspace", ws, "--window", win] },
+    { stage: "focus-pane", args: ["focus-pane", "--pane", pane, "--workspace", ws, "--window", win] },
+  ];
+  if (targetSurface !== null && surfIds !== null && surfIds.length >= 2) {
+    const idx = surfIds.indexOf(targetSurface);
+    if (idx > 0) {
+      steps.push({
+        stage: "reorder-surface",
+        args: ["reorder-surface", "--surface", targetSurface, "--after", surfIds[idx - 1]!, "--focus", "true", "--workspace", ws, "--window", win],
+      });
+    } else if (idx === 0) {
+      steps.push({
+        stage: "reorder-surface",
+        args: ["reorder-surface", "--surface", targetSurface, "--before", surfIds[1]!, "--focus", "true", "--workspace", ws, "--window", win],
+      });
+    }
+  }
+  for (const s of steps) {
+    const r = await runCmuxFocusStep(s.args);
+    if (r.code !== 0) return json({ ok: false, reason: `step:${s.stage}` }, 200);
+  }
+
+  // R3 post-tree 재조회. 되돌리기는 하지 않는다.
+  const post = await readFocusTree();
+  if (!post) return json({ ok: false, reason: "no_cmux" }, 200);
+  if (targetSurface !== null) {
+    const hit = post.surfaces.get(targetSurface);
+    if (!hit || hit.pane !== pane || !hit.selected) {
+      return json({ ok: false, reason: "not_selected" }, 200);
+    }
+    if (!sameIdSeq(pre.panes.get(pane) ?? [], post.panes.get(pane) ?? [])) {
+      return json({ ok: false, reason: "order_changed" }, 200);
+    }
+    return json({ ok: true, reason: null }, 200);
+  }
+  const whit = post.workspaces.get(ws);
+  if (!whit || !whit.selected) return json({ ok: false, reason: "not_selected" }, 200);
+  if (!sameIdSeq(pre.panes.get(pane) ?? [], post.panes.get(pane) ?? [])) {
+    return json({ ok: false, reason: "order_changed" }, 200);
+  }
+  return json({ ok: true, reason: null }, 200);
 }
 
 // ── /version (PRD §6-3 증거 binding의 한쪽 출처) ────────────────────────────
@@ -691,7 +1081,16 @@ function eventsResponse(): Response {
 }
 
 async function handle(req: Request): Promise<Response> {
-  const url = new URL(req.url);
+  // URL 파싱 실패(Host 없는 HTTP/1.0 포함)는 게이트 이전에 닫는다. R4(a).
+  let url: URL;
+  try {
+    url = new URL(req.url);
+  } catch {
+    return new Response(JSON.stringify({ ok: false, reason: "forbidden" }), {
+      status: 403,
+      headers: { "content-type": "application/json" },
+    });
+  }
   const path = url.pathname;
 
   if (path === "/events") return eventsResponse();
@@ -720,6 +1119,8 @@ async function handle(req: Request): Promise<Response> {
     const n = Math.min(200, Math.max(1, Number.isFinite(raw) ? Math.trunc(raw) : 20));
     return termResponse(name, n);
   }
+
+  if (path === "/focus") return handleFocus(req);
 
   if (path === "/") {
     const file = Bun.file(UI_PATH);

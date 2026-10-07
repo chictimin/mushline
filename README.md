@@ -85,19 +85,37 @@ The gear button at the right end of the header opens the list settings:
 The pin button on each card keeps that agent near the top and highlights its name
 as sender or recipient in the Log tab. Settings and pins are remembered per browser.
 
+Clicking an agent's name focuses its cmux terminal (window → workspace → pane → tab, tab order unchanged).
+Names dimmed when not running in cmux do nothing; failed attempts show a brief reason on the card.
+
 ## Notes
 
-- **Read-only.** Never writes to `~/.hcom/hcom.db`. Test against a copy, not the live DB.
+- **Read-only.** hcom DB 는 읽기 전용; 이름 클릭 시에만 cmux 포커스 명령 실행(127.0.0.1, Host/Origin 검사).
+  Test against a copy, not the live DB.
+  The focus commands are `focus-window`, `select-workspace`, `focus-pane`
+  and `reorder-surface --focus`. Measured with cmux 0.64.25.
 - **Fixed port.** `http://127.0.0.1:7377`, no auto-discovery — exits if occupied.
 - License: MIT.
 
 ## Changelog
 
+### 2026-10-07 (terminal focus)
+
+- Clicking an agent's name focuses its cmux terminal (`POST /focus` with the agent
+  name; the server resolves window/workspace/pane/surface from a fresh
+  `cmux tree`, runs `focus-window` → `select-workspace` → `focus-pane` →
+  `reorder-surface --focus` with neighbour ids, then re-reads the tree to confirm).
+  Tab order is preserved (neighbour `--after`/`--before`, never `--index`).
+  Agents not running in cmux show a dimmed name that does nothing; failures show a
+  short reason on the card. Local-only: Host/Origin checks on `127.0.0.1`.
+  Measured with cmux 0.64.25, which has no pure surface-select command
+  (hence the `reorder-surface` no-op usage).
+
 ### 2026-10-07
 
 - Group detection follows surface UUIDs (`cmux --id-format both tree --all --json`);
   shared dock surfaces across groups fall back to directory.
-  Unverified: whether `workspace-group list` (no window flag) returns groups from all windows.
+  그룹은 cmux 창 단위이며 서버를 띄운 창의 그룹만 본다.
   Agents spawned as tabs (`cmuxtab` preset) now join their workspace group in the filter.
 - Activity sort (default on), Compact view and Clear pins, behind a gear button in the Agents header.
   Cards are updated in place; pointer or focus inside the list pauses auto-reorder only.
