@@ -329,6 +329,56 @@
     background: #241f2b;
     border-left: 3px solid #e05353;
   }
+  /* M5: 섹션 모드에서 blocked 카드 sticky 해제. stuck 카드가 섹션 소속을
+     시각적으로 배반하므로 static으로 되돌린다. 단일 모드는 기존 그대로. */
+  #agentList.sections .agent.blocked { position: static; }
+  /* M5 rev2: 그룹 헤더 띠. 리스트 전폭, 카드 head 한 줄 수준 높이,
+     왼쪽 3px 그룹 색 실선(색은 인라인), 위쪽 구분선.
+     텍스트는 기존 muted 토큰 유지. 내부는 셰브론 + 라벨(말줄임) +
+     요약 아이콘(줄어들지 않음). 전부 textContent. */
+  #agentList .agroup {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-sizing: border-box;
+    width: 100%;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    min-width: 0;
+    padding: 5px 8px;
+    border-top: 1px solid var(--border);
+    border-left-width: 3px;
+    border-left-style: solid;
+    cursor: default;
+  }
+  #agentList .agroup[role="button"] { cursor: pointer; }
+  #agentList .agroup .agchev { flex: none; }
+  #agentList .agroup .aglabel {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #agentList .agroup .agsum { flex: none; font-size: 11px; letter-spacing: 0; }
+  /* M5: Attention 카드 head 안 상태 표시 바로 앞 그룹 라벨. muted 11px,
+     min-width:0 + ellipsis. head가 좁아지면 이름보다 먼저 줄어든다
+     (hact는 flex:none이라 상태·핀은 줄지 않는다). */
+  .agent .wslabel {
+    flex: 0 1 auto;
+    min-width: 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .agent .head {
     display: flex;
     justify-content: space-between;
@@ -668,6 +718,9 @@
   var COMPACT_KEY = "mushline.compact";
   /* M3: 핀 영속. 이름 문자열 JSON 배열. 깨지면 빈 집합. */
   var PINS_KEY = "mushline.pins";
+  /* M5 rev2: 접기 상태 영속. 섹션 키 문자열 JSON 배열. 미분류(null)는 ""로 적는다.
+     Attention은 접히지 않아 저장하지 않는다. 깨지면 빈 집합. */
+  var COLLAPSED_KEY = "mushline.collapsed";
   /* M4: 이름 클릭 포커스. Abort 상한 15초, 실패 표시 2.5초. */
   var FOCUS_TIMEOUT_MS = 15000;
   var FOCUS_ERR_MS = 2500;
@@ -711,12 +764,16 @@
     compact: false,
     /* M3: 핀한 이름 집합(프로토타입 오염 방지용 null-prototype). */
     pins: Object.create(null),
+    /* M5 rev2: 접힌 섹션 키 집합(저장용 문자열 → true. 미분류는 ""). */
+    collapsed: Object.create(null),
     /* M3: pointer/focus 독립 추적. holdOrder = pointerInside || focusInside. */
     pointerInside: false,
     focusInside: false,
     holdOrder: false,
     /* M3: 보류 중에 건너뛴 재정렬이 있으면 해제 시 1회 한다. */
-    orderPending: false
+    orderPending: false,
+    /* M5 rev2: renderAgents 재진입 가드. 아래 R20 주석 참조. */
+    rendering: false
   };
 
   /* M3: storage 읽기는 전부 삼킨다. 파싱 실패·비배열·비문자열 원소는 무시. */
@@ -735,6 +792,23 @@
     try { window.localStorage.setItem(PINS_KEY, JSON.stringify(Object.keys(state.pins))); }
     catch (e) { /* 무시 */ }
   }
+  /* M5 rev2: 접기 상태 읽기·쓰기. M3 pins와 같은 방어(파싱 실패·비배열 무시,
+     비문자열 원소 무시, storage 예외 삼킴, null-prototype). */
+  function loadCollapsed() {
+    try {
+      var raw = window.localStorage.getItem(COLLAPSED_KEY);
+      if (!raw) return Object.create(null);
+      var v = JSON.parse(raw);
+      if (!Array.isArray(v)) return Object.create(null);
+      var o = Object.create(null);
+      for (var i = 0; i < v.length; i++) if (typeof v[i] === "string") o[v[i]] = true;
+      return o;
+    } catch (e) { return Object.create(null); }
+  }
+  function saveCollapsed() {
+    try { window.localStorage.setItem(COLLAPSED_KEY, JSON.stringify(Object.keys(state.collapsed))); }
+    catch (e) { /* 무시 */ }
+  }
 
   try {
     var saved = window.localStorage.getItem(VIEW_KEY);
@@ -745,6 +819,7 @@
     if (window.localStorage.getItem(SORT_KEY) === "0") state.sortOn = false;
     if (window.localStorage.getItem(COMPACT_KEY) === "1") state.compact = true;
     state.pins = loadPins();
+    state.collapsed = loadCollapsed();
   } catch (e) { /* localStorage 불가 환경에서는 기본 뷰·기본 토글·빈 핀 */ }
 
   function pad(n) { return (n < 10 ? "0" : "") + n; }
@@ -884,6 +959,176 @@
     return false;
   }
 
+  /* M5: 그룹 표시 라벨. 필터 옵션 라벨(ui.html renderWsOptions)과 같은 규칙.
+     wsLabel이 있으면 쓰고, 없으면 dir: 접두 제거 경로, 그것도 아니면 키. */
+  function wsDisplayLabel(key) {
+    var lbl = state.wsLabel.get(key);
+    if (lbl) return lbl;
+    if (key.indexOf("dir:") === 0) return key.slice(4);
+    return key;
+  }
+  /* M5: 표시 라벨 대소문자 무시 오름차순, 동률은 키 오름차순.
+     다른 키가 같은 라벨이면 별도 섹션. null(미분류)은 맨 끝. */
+  function cmpGroupKey(x, y) {
+    if (x === null && y === null) return 0;
+    if (x === null) return 1;
+    if (y === null) return -1;
+    var lx = wsDisplayLabel(x).toLowerCase(), ly = wsDisplayLabel(y).toLowerCase();
+    if (lx < ly) return -1;
+    if (lx > ly) return 1;
+    return x < y ? -1 : (x > y ? 1 : 0);
+  }
+  /* M5: Sort ON 섹션 안 순서. 단일 리스트 모드의 ON 규칙과 같다. */
+  function sortMembers(members) {
+    members.sort(function (a, b) {
+      var r = agentRank(a) - agentRank(b);
+      if (r !== 0) return r;
+      var t = cmpLastEventDesc(a.lastEventAt, b.lastEventAt);
+      if (t !== 0) return t;
+      return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0);
+    });
+    return members;
+  }
+  /* M5: 섹션 키 = Agent.workspace 키. null/undefined/""는 미분류(null). */
+  function groupKeyOf(a) {
+    if (a.workspace === null || a.workspace === undefined || a.workspace === "") return null;
+    return a.workspace;
+  }
+  /* M5: Attention 소속 = blocked 또는 pinned. */
+  function isAttention(a) {
+    return a.status === "blocked" || !!state.pins[a.name];
+  }
+  /* M5 rev2 R14: 그룹 팔레트. 빨강 계열(blocked/에러와 혼동) 제외 10색, 바(실선) 색.
+     배경은 바 색 12% + 다크 베이스(#1c1e26) 88% 혼합 불투명 틴트 —
+     하네스가 알파를 무시하고 원시 RGB로 대비를 재므로 rgba가 아닌
+     혼합 후 rgb()를 그대로 쓴다. */
+  var GROUP_PALETTE = ["#4c9aff", "#4dd0e1", "#5eead4", "#3ddc97", "#7bd88a",
+    "#b8e05c", "#ffd54d", "#d3a6ff", "#9d8cff", "#7cc4ff"];
+  var GROUP_BASE = [28, 30, 38];
+  var GROUP_TINT_Q = 0.12;
+  var UNGROUPED_BAR = "#8a8a8a";
+  var UNGROUPED_BG = "rgb(35, 37, 44)";
+  var ATTENTION_BG = "#241f2b";
+  var ATTENTION_BAR = "#e05353";
+  /* M5 rev2 R14: 섹션 키의 결정적 해시(djb2) → 팔레트 인덱스.
+     리로드·재정렬과 무관하게 같은 키는 같은 색. */
+  function groupColorIdx(key) {
+    var s = String(key === null || key === undefined ? "" : key);
+    var h = 5381;
+    for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+    return (h >>> 0) % GROUP_PALETTE.length;
+  }
+  function hexRgb(hex) {
+    return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16),
+      parseInt(hex.slice(5, 7), 16)];
+  }
+  function groupBg(barHex) {
+    var c = hexRgb(barHex);
+    var r = Math.round(GROUP_BASE[0] + (c[0] - GROUP_BASE[0]) * GROUP_TINT_Q);
+    var g = Math.round(GROUP_BASE[1] + (c[1] - GROUP_BASE[1]) * GROUP_TINT_Q);
+    var b = Math.round(GROUP_BASE[2] + (c[2] - GROUP_BASE[2]) * GROUP_TINT_Q);
+    return "rgb(" + r + ", " + g + ", " + b + ")";
+  }
+  function groupBarFor(key) {
+    if (key === null) return UNGROUPED_BAR;
+    return GROUP_PALETTE[groupColorIdx(key)];
+  }
+  function groupBgFor(key) {
+    if (key === null) return UNGROUPED_BG;
+    return groupBg(groupBarFor(key));
+  }
+  /* M5 rev2 R18: 접힌 헤더 대표 상태 1개.
+     active ▶ > listening ● > unknown ◦ > inactive ○.
+     blocked는 Attention에 있어 그룹에 없다. */
+  function groupSummaryOf(members) {
+    var hasL = false, hasU = false;
+    for (var i = 0; i < members.length; i++) {
+      var st = members[i].status;
+      if (st === "active") return { status: "active", glyph: "▶" };
+      if (st === "listening") hasL = true;
+      else if (st === "unknown") hasU = true;
+    }
+    if (hasL) return { status: "listening", glyph: "●" };
+    if (hasU) return { status: "unknown", glyph: "◦" };
+    return { status: "inactive", glyph: "○" };
+  }
+  /* M5 rev2 R17: 저장용 키. 미분류(null)는 "". Attention은 저장하지 않는다. */
+  function collapseStoreKey(k) {
+    return (k === null || k === undefined) ? "" : k;
+  }
+  function isCollapsed(k) {
+    if (k === "@attention") return false;
+    return !!state.collapsed[collapseStoreKey(k)];
+  }
+  function toggleCollapse(storeKey, restore) {
+    if (storeKey === "@attention") return;
+    if (state.collapsed[storeKey]) delete state.collapsed[storeKey];
+    else state.collapsed[storeKey] = true;
+    saveCollapsed();
+    /* 명시 조작이라 보류 중에도 즉시. */
+    renderAgents(true);
+    /* M5 rev2 R20: 키보드 토글에 한해 같은 키 헤더로 포커스 복원.
+       클릭 토글은 복원하지 않는다 — 복원된 포커스가 hold를 만들어
+       접힌 섹션 카드의 Attention 이동(R19)을 보류에 가두기 때문이다. */
+    if (!restore) return;
+    var heads = agentList.querySelectorAll(".agroup");
+    for (var i = 0; i < heads.length; i++) {
+      if (heads[i].getAttribute("data-skey") === storeKey) {
+        try { heads[i].focus(); } catch (e) { /* 무시 */ }
+        return;
+      }
+    }
+  }
+  /* M5 rev2 R13/R15/R16/R18: 섹션 헤더 생성. Attention은 경고 톤·접기 없음.
+     그룹·Ungrouped는 role=button + 셰브론 + 접기, 접힌 헤더에만 대표 아이콘 1개.
+     전부 textContent(esc()는 HTML 이스케이프가 아니다). */
+  function buildSectionHeader(s) {
+    var h = document.createElement("div");
+    h.className = "agroup";
+    var labelText = s.label + " · " + s.members.length;
+    if (s.key === "@attention") {
+      h.setAttribute("data-skey", "@attention");
+      h.textContent = labelText;
+      h.title = labelText;
+      h.style.backgroundColor = ATTENTION_BG;
+      h.style.borderLeftColor = ATTENTION_BAR;
+      return h;
+    }
+    var sk = collapseStoreKey(s.key);
+    h.setAttribute("data-skey", sk);
+    h.style.backgroundColor = groupBgFor(s.key);
+    h.style.borderLeftColor = groupBarFor(s.key);
+    h.setAttribute("role", "button");
+    h.setAttribute("tabindex", "0");
+    var collapsed = isCollapsed(s.key);
+    h.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    var chev = document.createElement("span");
+    chev.className = "agchev";
+    chev.setAttribute("aria-hidden", "true");
+    chev.textContent = collapsed ? "▸" : "▾";
+    h.appendChild(chev);
+    var lab = document.createElement("span");
+    lab.className = "aglabel";
+    lab.textContent = labelText;
+    h.appendChild(lab);
+    h.title = labelText;
+    if (collapsed) {
+      var sum = groupSummaryOf(s.members);
+      var sg = document.createElement("span");
+      sg.className = "agsum sg-" + sum.status;
+      sg.textContent = sum.glyph;
+      sg.title = sum.status;
+      h.appendChild(sg);
+    }
+    (function (key) {
+      h.addEventListener("click", function () { toggleCollapse(key, false); });
+      h.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggleCollapse(key, true); }
+      });
+    })(sk);
+    return h;
+  }
+
   function renderWsOptions() {
     var counts = new Map();
     state.agents.forEach(function (a) {
@@ -893,10 +1138,8 @@
     var keys = Array.from(counts.keys());
     /* 선택한 워크스페이스에 지금 에이전트가 없어도 선택은 유지한다(재기동 대기). */
     if (state.ws !== WS_ALL && keys.indexOf(state.ws) < 0) keys.push(state.ws);
-    keys.sort(function (x, y) {
-      var lx = state.wsLabel.get(x) || x, ly = state.wsLabel.get(y) || y;
-      return lx < ly ? -1 : (lx > ly ? 1 : 0);
-    });
+    /* M5: 필터 옵션 정렬도 섹션과 같은 비교자(표시 라벨 대소문자 무시). */
+    keys.sort(cmpGroupKey);
     /* M3-ui3: 옵션 라벨에 카운트를 붙이지 않는다("All", "label" 그대로).
        카운트 변화만으로는 다시 그리지 않는다. */
     var sig = state.ws + "|" + keys.map(function (k) {
@@ -1011,11 +1254,99 @@
     return combineLine("tool:" + a.label, a.detail);
   }
 
+  /* M5: 섹션 구성. Attention(blocked 또는 pinned, 0명이면 없음) +
+     그룹 섹션(미분류 포함, 표시 라벨 대소문자 무시 정렬, 미분류 맨 끝).
+     필터=All이고 그룹 섹션이 2개 이상일 때만 섹션 모드, 아니면 단일 리스트.
+     Sort OFF 섹션 안은 엄격 서버 순서(blocked/pinned float 없음).
+     단일 모드는 기존 sortedAgents 규칙 그대로. */
+  function computeSections() {
+    var vis = [];
+    state.agents.forEach(function (a) {
+      if (inWs(a.name)) vis.push(a);
+    });
+    var att = [], rest = [];
+    vis.forEach(function (a) {
+      if (isAttention(a)) att.push(a);
+      else rest.push(a);
+    });
+    var byKey = new Map(), order = [];
+    rest.forEach(function (a) {
+      var k = groupKeyOf(a);
+      if (!byKey.has(k)) { byKey.set(k, []); order.push(k); }
+      byKey.get(k).push(a);
+    });
+    var sectionsMode = (state.ws === WS_ALL) && (order.length >= 2);
+    var sections = [];
+    if (sectionsMode) {
+      if (att.length > 0) {
+        sections.push({
+          key: "@attention", label: "Attention",
+          members: state.sortOn ? sortMembers(att.slice()) : att
+        });
+      }
+      order.sort(cmpGroupKey);
+      order.forEach(function (k) {
+        var members = byKey.get(k);
+        sections.push({
+          key: k,
+          label: (k === null) ? "Ungrouped" : wsDisplayLabel(k),
+          members: state.sortOn ? sortMembers(members.slice()) : members
+        });
+      });
+    }
+    return {
+      mode: sectionsMode ? "sections" : "single",
+      sections: sections,
+      single: sectionsMode ? null : sortedAgents()
+    };
+  }
+
+  /* M5: Attention 카드 head 안 상태 표시 바로 앞 그룹 라벨(R2 표시 라벨).
+     textContent로만 넣는다(esc()는 HTML 이스케이프가 아니다).
+     label이 null이면 제거(섹션 이동 시 라벨 제거). */
+  function syncWsLabel(wrap, label) {
+    if (label === null || label === undefined) {
+      if (wrap._wslabel && wrap._wslabel.parentNode) {
+        wrap._wslabel.parentNode.removeChild(wrap._wslabel);
+      }
+      wrap._wslabel = null;
+      return;
+    }
+    if (!wrap._wslabel) {
+      wrap._wslabel = document.createElement("span");
+      wrap._wslabel.className = "wslabel";
+      wrap._head.insertBefore(wrap._wslabel, wrap._hact);
+    }
+    wrap._wslabel.textContent = label;
+    wrap._wslabel.title = label;
+  }
+
   /* M3: 이름별 노드 재사용. 새 이름만 만들고, 있는 건 내용만 갱신한다.
      explicit=true(핀·필터·정렬 토글 같은 명시 조작)는 보류 중에도 즉시 재정렬.
-     자동 렌더는 보류 중이면 내용 갱신·신규/삭제만 하고 순서는 둔다. */
+     자동 렌더는 보류 중이면 내용 갱신·신규/삭제만 하고 순서는 둔다.
+     M5: 섹션 모드에서는 헤더(매 렌더 재생성) + 섹션별 카드 배치.
+     보류 중에는 헤더·순서를 손대지 않고 신규 카드만 끝에 붙인다. */
   function renderAgents(explicit) {
-    var list = sortedAgents();
+  /* M5 rev2 R20: 헤더 제거 중 focused 헤더가 떨어지면 blur가 동기 실행돼
+     focusout→syncHold→releaseHold→renderAgents로 재진입한다.
+     재진입이 바깥 제거 루프와 같은 노드를 또 떼면 throw + 헤더 중복이다.
+     재진입은 바깥 렌더가 같은 state로 끝내므로 orderPending만 남기고 돌아간다. */
+  if (state.rendering) {
+    if (!explicit) state.orderPending = true;
+    return;
+  }
+  state.rendering = true;
+  try {
+    var plan = computeSections();
+    var list;
+    if (plan.mode === "sections") {
+      list = [];
+      plan.sections.forEach(function (s) {
+        s.members.forEach(function (m) { list.push(m); });
+      });
+    } else {
+      list = plan.single;
+    }
     /* M3-ui2: 카운트는 타이틀 옆 "(N)" / "(보이는 수/N)". 숫자는 기존과 동일
        (전체 = state.agents.length, 필터 시 보이는 수/전체). */
     agentCount.textContent = "(" + (state.ws === WS_ALL ? "" : list.length + "/") +
@@ -1025,7 +1356,27 @@
     /* M3 rework B: hold 중 메시지 전용 렌더는 카드 렌더를 건너뛰고 orderPending만 유지. */
     if (!explicit && !state.agentsDirty && state.holdOrder) return;
     var reorder = explicit || !state.holdOrder;
+    /* M5: 이름 → Attention 표시 라벨. 섹션 모드 Attention 소속만, 아니면 null.
+       보류 중에도 내용 갱신은 즉시(섹션 이동·헤더만 보류)라 새 소속 기준으로 둔다. */
+    var attLabelOf = Object.create(null);
+    if (plan.mode === "sections") {
+      plan.sections.forEach(function (s) {
+        if (s.key !== "@attention") return;
+        s.members.forEach(function (a) {
+          var k = groupKeyOf(a);
+          attLabelOf[a.name] = (k === null) ? "Ungrouped" : wsDisplayLabel(k);
+        });
+      });
+    }
     var seen = Object.create(null);
+    /* M5 rev2: 이름 → 소속 섹션 키. 접힌 섹션 카드는 hidden(DOM 유지,
+       카드 노드 재사용·M4 리스너 보존). */
+    var secOf = Object.create(null);
+    if (plan.mode === "sections") {
+      plan.sections.forEach(function (s) {
+        s.members.forEach(function (a) { secOf[a.name] = s.key; });
+      });
+    }
     var i, a, el;
     for (i = 0; i < list.length; i++) {
       a = list[i];
@@ -1037,7 +1388,17 @@
       } else {
         updateAgentCard(el, a);
       }
-      if (!el.parentNode) agentList.appendChild(el);
+      syncWsLabel(el, attLabelOf[a.name] || null);
+      /* M5 rev2 R19: 소속은 새 state 기준(내용 갱신은 즉시)이나,
+         보류 중에는 기존 카드의 숨김을 손대지 않고 이동만 보류(R9).
+         신규 카드는 소속대로 둔다. */
+      var wantHidden = (plan.mode === "sections") ? isCollapsed(secOf[a.name]) : false;
+      if (!el.parentNode) {
+        el.hidden = wantHidden;
+        agentList.appendChild(el);
+      } else if (reorder) {
+        el.hidden = wantHidden;
+      }
     }
     state.cardOf.forEach(function (node, nm) {
       if (!seen[nm]) {
@@ -1046,9 +1407,30 @@
       }
     });
     if (reorder) {
-      for (i = 0; i < list.length; i++) {
-        el = state.cardOf.get(list[i].name);
-        if (el) agentList.appendChild(el);
+      /* M5: 헤더 노드는 매 렌더 재생성(비인터랙티브, 상태 없음).
+         카드 Element 참조는 유지(이동만, 재생성 없음). */
+      var oldHeads = agentList.querySelectorAll(".agroup");
+      for (i = 0; i < oldHeads.length; i++) {
+        if (oldHeads[i].parentNode === agentList) agentList.removeChild(oldHeads[i]);
+      }
+      if (plan.mode === "sections") {
+        agentList.classList.add("sections");
+        for (i = 0; i < plan.sections.length; i++) {
+          (function (s) {
+            /* M5 rev2: 띠·색·접기·요약 헤더. 재생성하되 카드 참조는 유지. */
+            agentList.appendChild(buildSectionHeader(s));
+            s.members.forEach(function (m) {
+              var node = state.cardOf.get(m.name);
+              if (node) agentList.appendChild(node);
+            });
+          })(plan.sections[i]);
+        }
+      } else {
+        agentList.classList.remove("sections");
+        for (i = 0; i < list.length; i++) {
+          el = state.cardOf.get(list[i].name);
+          if (el) agentList.appendChild(el);
+        }
       }
       state.orderPending = false;
     } else {
@@ -1056,13 +1438,16 @@
     }
     /* FR-15: 5명 이상일 때만 하단 스크롤. 4명 이하에서는 max-height를 두지 않아
        O-2①(무스크롤)을 구조적으로 보장한다. UI 배치 #3: 인라인 스타일 대신
-       tall 클래스 + 상수로만 토글한다. */
+       tall 클래스 + 상수로만 토글한다. 헤더는 세지 않고 카드 수 기준(R11). */
     if (list.length >= AGENT_TALL_MIN_N) {
       agentList.classList.add(AGENT_TALL_CLASS);
     } else {
       agentList.classList.remove(AGENT_TALL_CLASS);
     }
     state.agentsDirty = false;
+  } finally {
+    state.rendering = false;
+  }
   }
 
   function displayNameOf(a) {
@@ -1223,6 +1608,9 @@
     head.appendChild(hact);
     head.setAttribute("data-agent", esc(a.name));
     wrap.appendChild(head);
+    wrap._head = head;
+    wrap._hact = hact;
+    wrap._wslabel = null;
     wrap._glyph = glyph;
     wrap._aname = aname;
     wrap._who = who;
