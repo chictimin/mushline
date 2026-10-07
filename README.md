@@ -57,7 +57,11 @@ The select next to the **Agents** header narrows the whole board to one group:
 the agent list, the Log tab and the Timeline tab all follow it. The choice is remembered per browser.
 
 - Agents launched in a **cmux workspace group** are grouped by that group's name
-  (hcom's `launch_context.pane_id` is the cmux workspace UUID).
+  (the `cmuxtab` preset stores the cmux **surface** UUID in hcom's `launch_context.pane_id`,
+  while the `cmux` preset stores the workspace UUID; both forms are resolved through
+  `cmux --id-format both tree --all --json` workspaces and their `panes[].surfaces[].id`).
+  A surface shared by workspaces in different groups is treated as a shared dock
+  and falls back to directory grouping.
 - Agents outside a cmux group, or not running in cmux, are grouped by their working directory.
 - Each agent card shows its working directory (`~`-shortened).
 - A message is shown when its sender or any recipient is in the selected group.
@@ -66,6 +70,21 @@ the agent list, the Log tab and the Timeline tab all follow it. The choice is re
 
 cmux is optional. Without it, grouping falls back to directories and nothing else changes.
 
+## Agent list
+
+The header reads **Agents (19)**, or **Agents (5/19)** while a group is selected.
+The gear button at the right end of the header opens the list settings:
+
+- **Sort** (default on): blocked → pinned → active → listening → unknown → inactive,
+  most recent activity first within each. Off keeps the server order with blocked and pinned on top.
+  While the pointer or keyboard focus is inside the list, automatic reordering waits;
+  status text still updates.
+- **Compact** (default off): hides directory, description and history lines.
+- **Clear pins**: shown while any agent is pinned.
+
+The pin button on each card keeps that agent near the top and highlights its name
+as sender or recipient in the Log tab. Settings and pins are remembered per browser.
+
 ## Notes
 
 - **Read-only.** Never writes to `~/.hcom/hcom.db`. Test against a copy, not the live DB.
@@ -73,6 +92,26 @@ cmux is optional. Without it, grouping falls back to directories and nothing els
 - License: MIT.
 
 ## Changelog
+
+### 2026-10-07
+
+- Group detection follows surface UUIDs (`cmux --id-format both tree --all --json`);
+  shared dock surfaces across groups fall back to directory.
+  Unverified: whether `workspace-group list` (no window flag) returns groups from all windows.
+  Agents spawned as tabs (`cmuxtab` preset) now join their workspace group in the filter.
+- Activity sort (default on), Compact view and Clear pins, behind a gear button in the Agents header.
+  Cards are updated in place; pointer or focus inside the list pauses auto-reorder only.
+- Pin button (pushpin icon) on each card: pinned agents rank right after blocked
+  and their names are highlighted in the Log tab.
+- Agent count moved next to the title (`Agents (19)` / `Agents (5/19)`).
+  The group select drops its counts, fills the free header width and truncates long names
+  (full name on hover).
+- Log rows that arrive while the Timeline tab is open are measured on return to Log.
+- Demo without hcom no longer crashes: `fixtures/hcom-min.sql` gains `launch_context`,
+  and a failing DB fallback keeps the last agent list instead of exiting.
+- Test helpers: `fixtures/fake-cmux.sh` + `fixtures/fake-hcom.sh` with
+  `fixtures/cmux-case-{match,shared}-{tree,group}.json`
+  (`FAKE_CMUX_CASE=match|shared|fail`, `FAKE_HCOM_AGENTS`, `FAKE_CMUX_DIR`).
 
 ### 2026-09-29
 

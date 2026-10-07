@@ -425,34 +425,69 @@ function deriveLastEventAt(name: string): string | null {
 }
 
 /**
- * cmux workspace UUID → 소속 그룹 이름. hcom 은 cmux 에서 뜬 에이전트의 `launch_context.pane_id` 에
- * workspace UUID 를 싣는다(실측). 그룹 목록은 워크스페이스를 ref(`workspace:N`)로만 주므로
- * `tree` 의 UUID↔ref 로 잇는다. 워크스페이스 제목은 쓰지 않는다 — 에이전트 상태에 따라 계속 바뀐다.
+ * cmux workspace UUID → 소속 그룹 이름, 그리고 각 워크스페이스의
+ * panes[].surfaces[].id (surface UUID) → 소속 그룹 이름. hcom cmuxtab 프리셋으로
+ * 뜬 에이전트의 `launch_context.pane_id` 는 workspace UUID 가 아니라 surface UUID다(실측).
+ * 그룹 목록은 워크스페이스를 ref(`workspace:N`)로만 주므로 `tree` 의 UUID↔ref 로 잇는다.
+ * 같은 surface UUID 가 서로 다른 그룹의 워크스페이스에 나오면 공유 dock 으로 보고
+ * 맵에서 제외한다. 같은 그룹 안에서의 중복은 유지한다.
+ * 워크스페이스 제목은 쓰지 않는다 — 에이전트 상태에 따라 계속 바뀐다.
  * cmux 는 선택 의존이라 없거나 실패하면 빈 맵이고 health 에 넣지 않는다.
  */
 async function cmuxGroups(): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   try {
     const [treeRes, groupRes] = await Promise.all([
-      runCli(["tree", "--json"], CLI_TIMEOUT_MS, CMUX_BIN),
+      runCli(["--id-format", "both", "tree", "--all", "--json"], CLI_TIMEOUT_MS, CMUX_BIN),
       runCli(["workspace-group", "list", "--json"], CLI_TIMEOUT_MS, CMUX_BIN),
     ]);
     if (treeRes.code !== 0 || groupRes.code !== 0) return out;
     const tree = JSON.parse(treeRes.stdout) as { windows?: Array<{ workspaces?: Array<Record<string, unknown>> }> };
     const idOfRef = new Map<string, string>();
+    const wsById = new Map<string, Record<string, unknown>>();
     for (const win of tree.windows ?? []) {
       for (const ws of win.workspaces ?? []) {
         const id = nullable(ws.id), ref = nullable(ws.ref);
         if (id && ref) idOfRef.set(ref, id);
+        if (id) wsById.set(id, ws);
       }
     }
     const groups = JSON.parse(groupRes.stdout) as { groups?: Array<Record<string, unknown>> };
+    const wsGroup = new Map<string, string>();
     for (const g of groups.groups ?? []) {
       const name = nullable(g.name);
       if (!name || !Array.isArray(g.member_workspace_refs)) continue;
       for (const ref of g.member_workspace_refs) {
         const id = typeof ref === "string" ? idOfRef.get(ref) : undefined;
-        if (id) out.set(id, name);
+        if (id) {
+          out.set(id, name);
+          wsGroup.set(id, name);
+        }
+      }
+    }
+    const surfaceGroups = new Map<string, Set<string>>();
+    for (const [wsId, name] of wsGroup) {
+      const ws = wsById.get(wsId);
+      if (!ws || !Array.isArray(ws.panes)) continue;
+      for (const pane of ws.panes as Array<Record<string, unknown>>) {
+        if (!pane || !Array.isArray(pane.surfaces)) continue;
+        for (const s of pane.surfaces as Array<Record<string, unknown>>) {
+          const sid = nullable(s.id);
+          if (!sid) continue;
+          let owners = surfaceGroups.get(sid);
+          if (!owners) {
+            owners = new Set<string>();
+            surfaceGroups.set(sid, owners);
+          }
+          owners.add(name);
+        }
+      }
+    }
+    for (const [sid, owners] of surfaceGroups) {
+      if (owners.size === 1) {
+        for (const name of owners) out.set(sid, name);
+      } else {
+        out.delete(sid);
       }
     }
   } catch {}
@@ -508,9 +543,17 @@ function agentsFromCli(raw: unknown[], cmux: Map<string, string>): Agent[] {
 
 function agentsFromDb(cmux: Map<string, string>): Agent[] {
   if (!db) return [];
-  const rows = db
-    .query("SELECT name, tag, tool, status, status_context, status_detail, directory, launch_context FROM instances")
-    .all() as Array<Record<string, unknown>>;
+  let rows: Array<Record<string, unknown>>;
+  try {
+    rows = db
+      .query("SELECT name, tag, tool, status, status_context, status_detail, directory, launch_context FROM instances")
+      .all() as Array<Record<string, unknown>>;
+  } catch {
+    // 구스키마 DB(fixtures/hcom-min.sql 원형)에는 launch_context 가 없다 — 나머지 컬럼만 읽는다.
+    rows = db
+      .query("SELECT name, tag, tool, status, status_context, status_detail, directory FROM instances")
+      .all() as Array<Record<string, unknown>>;
+  }
   return rows.map((r) => {
     const name = String(r.name ?? "");
     return {
@@ -542,7 +585,18 @@ async function pollAgents() {
   } catch (e) {
     cliError = e instanceof Error ? e.message : String(e);
     // CLI 가 죽어도 화면을 비우지 않는다. 다만 health.ok 는 false 로 남아 배너가 뜬다.
-    next = db ? agentsFromDb(cmux) : agents;
+    // DB 폴백도 실패하면 예외를 밖으로 내지 않고 기존 agents 를 유지한다.
+    if (db) {
+      try {
+        next = agentsFromDb(cmux);
+      } catch (fallbackError) {
+        const reason = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+        cliError = `${cliError} / db fallback: ${reason}`;
+        next = agents;
+      }
+    } else {
+      next = agents;
+    }
   }
 
   const key = JSON.stringify(next);

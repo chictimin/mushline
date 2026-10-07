@@ -78,7 +78,8 @@ CREATE TABLE IF NOT EXISTS instances (
     directory         TEXT,
     created_at        REAL    NOT NULL,
     tool              TEXT    DEFAULT 'claude',
-    pid               INTEGER DEFAULT NULL
+    pid               INTEGER DEFAULT NULL,
+    launch_context    TEXT    DEFAULT ''
 );
 
 -- 최소 시드 — 매핑표 순번 1~6을 각각 한 번씩 때린다.

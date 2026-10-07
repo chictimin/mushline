@@ -163,10 +163,11 @@
   }
   #viewToggle { display: flex; gap: 4px; min-width: 0; }
   #agentHeader .hleft { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  #agentHeader .title, #agentHeader .count { flex: none; }
   #wsFilter {
-    flex: 0 1 auto;
-    min-width: 0;
-    max-width: 140px;
+    flex: 1 1 auto;
+    min-width: 48px;
+    max-width: 100%;
     min-height: 24px;
     font-family: var(--font-body);
     font-size: 11px;
@@ -176,6 +177,8 @@
     border-radius: 6px;
     padding: 2px 4px;
     text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
     cursor: pointer;
   }
   #wsFilter:hover { color: var(--fg); }
@@ -468,6 +471,129 @@
     margin-right: 4px;
     color: var(--muted);
   }
+  /* M3-ui3: 헤더는 277px에서 1줄 유지. 설정 버튼 1개만 두어 줄바꿈하지 않는다. */
+  #agentHeader { flex-wrap: nowrap; }
+  #agentHeader .hleft {
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+  /* M3-ui3: 설정 버튼 래퍼. 헤더 오른쪽 끝 고정 + 버블 위치 기준. */
+  #agentHeader .hsetwrap {
+    position: relative;
+    flex: none;
+    margin-left: auto;
+  }
+  #agentSettings {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    padding: 0;
+  }
+  #agentSettings:hover { color: var(--fg); background: rgba(255,255,255,0.05); }
+  #agentSettings[aria-expanded="true"] { color: var(--fg); background: rgba(255,255,255,0.1); }
+  #agentSettings svg { width: 16px; height: 16px; display: block; }
+  /* M3-ui3: 설정 버블. 버튼 아래 오른쪽 정렬, 리스트 위에 겹침.
+     z-index 5 = sticky blocked 카드(1) 위, 이력 모달(10) 아래. */
+  #agentSettingsPop {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 150px;
+    max-width: 200px;
+    padding: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+  }
+  #agentSettingsPop[hidden] { display: none; }
+  #agentSettingsPop .hbtn {
+    display: flex;
+    width: 100%;
+    text-align: left;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 6px;
+  }
+  /* M3-D1: 버블 안 토글 켜짐 식별. 색만이 아닌 체크+굵기로 구분.
+     ::before 빈칸(꺼짐/비토글) vs ✓(켜짐). Clear pins는 토글이 아니라 항상 빈칸. */
+  #agentSettingsPop .hbtn::before {
+    content: "";
+    flex: none;
+    width: 12px;
+    text-align: center;
+    font-size: 11px;
+    line-height: 1;
+  }
+  #agentSettingsPop #sortToggle[aria-pressed="true"]::before,
+  #agentSettingsPop #compactToggle[aria-pressed="true"]::before {
+    content: "✓";
+  }
+  #agentSettingsPop .hbtn[aria-pressed="true"] {
+    color: var(--fg);
+    background: rgba(255,255,255,0.1);
+    font-weight: 700;
+  }
+  .hbtn {
+    font-family: var(--font-body);
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 2px 6px;
+    min-height: 24px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .hbtn:hover { color: var(--fg); background: rgba(255,255,255,0.05); }
+  .hbtn[aria-pressed="true"] { color: var(--fg); background: rgba(255,255,255,0.1); }
+  .hbtn[hidden] { display: none; }
+  /* M3: 카드 head 우측 묶음(상태 + 핀). */
+  .agent .hact {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .agent .pinbtn {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    color: var(--faint);
+    cursor: pointer;
+    padding: 0;
+    font-size: 12px;
+    line-height: 1;
+  }
+  .agent .pinbtn:hover { color: var(--fg); background: rgba(255,255,255,0.06); }
+  .agent .pinbtn[aria-pressed="true"] { color: var(--warn); }
+  /* M3-ui2: 핀 압정 SVG 크기. width/height 속성과 동일. */
+  .agent .pinbtn svg { width: 12px; height: 12px; display: block; }
+  /* M3 간략 보기: dir·desc·hwrap 숨김, cur는 기존 1줄 말줄임 그대로. */
+  body.compact .agent .dir,
+  body.compact .agent .desc,
+  body.compact .agent .hwrap { display: none; }
+  /* M3 핀 강조: Log 탭 이름 span. */
+  .msg .meta [data-who].pinned { color: var(--warn); font-weight: 700; }
 </style>
 </head>
 <body>
@@ -487,7 +613,7 @@
   <div id="divider"></div>
   <section id="agentPane" aria-label="agents">
     <header id="agentHeader">
-      <span class="hleft"><span class="title">Agents</span><select id="wsFilter" aria-label="Filter by workspace group" title="Filter by workspace group"><option value="all">All</option></select></span><span class="count" id="agentCount"></span>
+      <span class="hleft"><span class="title">Agents</span><span class="count" id="agentCount"></span><select id="wsFilter" aria-label="Filter by workspace group" title="Filter by workspace group"><option value="all">All</option></select></span><span class="hsetwrap"><button id="agentSettings" aria-label="Agent list settings" aria-haspopup="true" aria-expanded="false" title="Agent list settings"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v1.9M8 12.3v1.9M1.8 8h1.9M12.3 8h1.9M3.6 3.6l1.3 1.3M11.1 11.1l1.3 1.3M12.4 3.6l-1.3 1.3M4.9 11.1l-1.3 1.3"/></svg></button><div id="agentSettingsPop" hidden aria-label="Agent list settings"><button id="sortToggle" class="hbtn" aria-pressed="true" title="Toggle activity sort">Sort</button><button id="compactToggle" class="hbtn" aria-pressed="false" title="Toggle compact view">Compact</button><button id="clearPins" class="hbtn" hidden title="Clear all pins">Clear pins</button></div></span>
     </header>
     <div id="agentList"></div>
   </section>
@@ -521,6 +647,12 @@
   /* 워크스페이스 필터 선택 영속. 값은 서버 Agent.workspace 키 또는 all. */
   var WS_KEY = "mushline.ws";
   var WS_ALL = "all";
+  /* M3: 활동순 정렬 토글 영속. "0"이면 OFF, 그 외(미설정 포함) ON. */
+  var SORT_KEY = "mushline.sort";
+  /* M3: 간략 보기 토글 영속. "1"이면 ON, 그 외(미설정 포함) OFF. */
+  var COMPACT_KEY = "mushline.compact";
+  /* M3: 핀 영속. 이름 문자열 JSON 배열. 깨지면 빈 집합. */
+  var PINS_KEY = "mushline.pins";
 
   var $ = function (id) { return document.getElementById(id); };
   var msgList = $("msgList"), agentList = $("agentList"), timeList = $("timeList");
@@ -528,6 +660,8 @@
   var connBanner = $("connBanner"), staleBanner = $("staleBanner"), vBanner = $("vBanner");
   var tabLogBtn = $("tabLog"), tabTimeBtn = $("tabTime");
   var wsFilter = $("wsFilter");
+  var sortToggle = $("sortToggle"), compactToggle = $("compactToggle"), clearPins = $("clearPins");
+  var agentSettings = $("agentSettings"), agentSettingsPop = $("agentSettingsPop");
 
   var state = {
     agents: [],
@@ -548,8 +682,41 @@
        끝난 에이전트의 로그도 이 세션 동안은 같은 워크스페이스로 분류된다. */
     wsOf: new Map(),
     /* workspace 키 → 마지막으로 본 라벨. */
-    wsLabel: new Map()
+    wsLabel: new Map(),
+    /* M3: 이름별 카드 DOM 노드 재사용표. 전체 재생성 대신 갱신·재배치한다. */
+    cardOf: new Map(),
+    /* M3: true면 renderAgents가 카드 DOM을 만진다. 메시지 추가만으로는 서지 않는다. */
+    agentsDirty: true,
+    /* M3: 활동순 정렬 ON이 기본. */
+    sortOn: true,
+    /* M3: 간략 보기 OFF가 기본. */
+    compact: false,
+    /* M3: 핀한 이름 집합(프로토타입 오염 방지용 null-prototype). */
+    pins: Object.create(null),
+    /* M3: pointer/focus 독립 추적. holdOrder = pointerInside || focusInside. */
+    pointerInside: false,
+    focusInside: false,
+    holdOrder: false,
+    /* M3: 보류 중에 건너뛴 재정렬이 있으면 해제 시 1회 한다. */
+    orderPending: false
   };
+
+  /* M3: storage 읽기는 전부 삼킨다. 파싱 실패·비배열·비문자열 원소는 무시. */
+  function loadPins() {
+    try {
+      var raw = window.localStorage.getItem(PINS_KEY);
+      if (!raw) return Object.create(null);
+      var v = JSON.parse(raw);
+      if (!Array.isArray(v)) return Object.create(null);
+      var o = Object.create(null);
+      for (var i = 0; i < v.length; i++) if (typeof v[i] === "string") o[v[i]] = true;
+      return o;
+    } catch (e) { return Object.create(null); }
+  }
+  function savePins() {
+    try { window.localStorage.setItem(PINS_KEY, JSON.stringify(Object.keys(state.pins))); }
+    catch (e) { /* 무시 */ }
+  }
 
   try {
     var saved = window.localStorage.getItem(VIEW_KEY);
@@ -557,7 +724,10 @@
     else if (saved === "agents") state.view = "log";
     var savedWs = window.localStorage.getItem(WS_KEY);
     if (typeof savedWs === "string" && savedWs !== "") state.ws = savedWs;
-  } catch (e) { /* localStorage 불가 환경에서는 기본 뷰 */ }
+    if (window.localStorage.getItem(SORT_KEY) === "0") state.sortOn = false;
+    if (window.localStorage.getItem(COMPACT_KEY) === "1") state.compact = true;
+    state.pins = loadPins();
+  } catch (e) { /* localStorage 불가 환경에서는 기본 뷰·기본 토글·빈 핀 */ }
 
   function pad(n) { return (n < 10 ? "0" : "") + n; }
 
@@ -709,25 +879,31 @@
       var lx = state.wsLabel.get(x) || x, ly = state.wsLabel.get(y) || y;
       return lx < ly ? -1 : (lx > ly ? 1 : 0);
     });
+    /* M3-ui3: 옵션 라벨에 카운트를 붙이지 않는다("All", "label" 그대로).
+       카운트 변화만으로는 다시 그리지 않는다. */
     var sig = state.ws + "|" + keys.map(function (k) {
-      return k + "=" + (state.wsLabel.get(k) || "") + ":" + (counts.get(k) || 0);
-    }).join("|") + "|" + state.agents.length;
+      return k + "=" + (state.wsLabel.get(k) || "");
+    }).join("|");
     if (wsFilter.getAttribute("data-sig") === sig) return;
     wsFilter.setAttribute("data-sig", sig);
     wsFilter.textContent = "";
     var all = document.createElement("option");
     all.value = WS_ALL;
-    all.textContent = "All (" + state.agents.length + ")";
+    all.textContent = "All";
     wsFilter.appendChild(all);
     keys.forEach(function (k) {
       var o = document.createElement("option");
       o.value = k;
       var label = state.wsLabel.get(k) || (k.indexOf("dir:") === 0 ? k.slice(4) : k);
-      o.textContent = label + " (" + (counts.get(k) || 0) + ")";
+      o.textContent = label;
       o.title = label;
       wsFilter.appendChild(o);
     });
     wsFilter.value = state.ws;
+    /* M3-ui3 추가요구2: fluid로 잘린 선택값의 전체 라벨은 select title로
+       보여준다(option title은 드롭다운 쪽). */
+    wsFilter.title = state.ws === WS_ALL ? "All"
+      : (state.wsLabel.get(state.ws) || (state.ws.indexOf("dir:") === 0 ? state.ws.slice(4) : state.ws));
   }
 
   function applyMsgFilter() {
@@ -749,20 +925,57 @@
     renderWsOptions();
     applyMsgFilter();
     applyView();
+    renderAgents(true);
     renderTimeOnce();
     flushMeasure();
     if (stickToBottom) msgPane.scrollTop = msgPane.scrollHeight;
   }
   wsFilter.addEventListener("change", function () { setWs(wsFilter.value); });
 
+  /* M3 활동순: blocked → pinned → active → listening → unknown → inactive,
+     동률은 lastEventAt 내림차순(null은 뒤), 다음 name 오름차순. */
+  function agentRank(a) {
+    if (a.status === "blocked") return 0;
+    if (state.pins[a.name]) return 1;
+    if (a.status === "active") return 2;
+    if (a.status === "listening") return 3;
+    if (a.status === "unknown") return 4;
+    return 5;
+  }
+  /* 내림차순 비교. null·undefined·""은 뒤. 같으면 0. */
+  function cmpLastEventDesc(x, y) {
+    var nx = (x === null || x === undefined || x === "");
+    var ny = (y === null || y === undefined || y === "");
+    if (nx && ny) return 0;
+    if (nx) return 1;
+    if (ny) return -1;
+    return x < y ? 1 : (x > y ? -1 : 0);
+  }
+
   function sortedAgents() {
-    var blocked = [], rest = [];
+    var vis = [];
     state.agents.forEach(function (a) {
-      if (!inWs(a.name)) return;
-      if (a.status === "blocked") blocked.push(a);
-      else rest.push(a);
+      if (inWs(a.name)) vis.push(a);
     });
-    return blocked.concat(rest);
+    /* 정렬 OFF = 기존 동작(blocked 먼저, 나머지 서버 순서).
+       pinned은 OFF에서도 blocked 다음. */
+    if (!state.sortOn) {
+      var blocked = [], pinned = [], rest = [];
+      vis.forEach(function (a) {
+        if (a.status === "blocked") blocked.push(a);
+        else if (state.pins[a.name]) pinned.push(a);
+        else rest.push(a);
+      });
+      return blocked.concat(pinned, rest);
+    }
+    vis.sort(function (a, b) {
+      var r = agentRank(a) - agentRank(b);
+      if (r !== 0) return r;
+      var t = cmpLastEventDesc(a.lastEventAt, b.lastEventAt);
+      if (t !== 0) return t;
+      return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0);
+    });
+    return vis;
   }
 
   function historyFor(name) {
@@ -780,98 +993,49 @@
     return combineLine("tool:" + a.label, a.detail);
   }
 
-  function renderAgents() {
-    agentList.textContent = "";
+  /* M3: 이름별 노드 재사용. 새 이름만 만들고, 있는 건 내용만 갱신한다.
+     explicit=true(핀·필터·정렬 토글 같은 명시 조작)는 보류 중에도 즉시 재정렬.
+     자동 렌더는 보류 중이면 내용 갱신·신규/삭제만 하고 순서는 둔다. */
+  function renderAgents(explicit) {
     var list = sortedAgents();
-    agentCount.textContent = (state.ws === WS_ALL ? "" : list.length + "/") +
-      state.agents.length + " agents";
-    list.forEach(function (a) {
-      var wrap = document.createElement("div");
-      wrap.className = "agent" + (a.status === "blocked" ? " blocked" : "");
-
-      var head = document.createElement("div");
-      head.className = "head";
-      var displayName = (a.tag !== null && a.tag !== undefined && a.tag !== "")
-        ? a.tag + "/" + a.name : esc(a.name);
-      var who = document.createElement("span");
-      who.className = "who";
-      var aname = document.createElement("span");
-      aname.className = "aname";
-      aname.textContent = displayName + (a.unreadCount > 0 ? " (" + a.unreadCount + ")" : "");
-      who.appendChild(aname);
-      var abbr = toolAbbr(a.tool);
-      if (abbr !== null) {
-        var badge = document.createElement("span");
-        badge.className = "tool";
-        badge.setAttribute("data-tool", esc(a.tool));
-        badge.textContent = abbr;
-        badge.title = esc(a.tool);
-        who.appendChild(badge);
+    /* M3-ui2: 카운트는 타이틀 옆 "(N)" / "(보이는 수/N)". 숫자는 기존과 동일
+       (전체 = state.agents.length, 필터 시 보이는 수/전체). */
+    agentCount.textContent = "(" + (state.ws === WS_ALL ? "" : list.length + "/") +
+      state.agents.length + ")";
+    updateClearPins();
+    if (!explicit && !state.agentsDirty && !state.orderPending) return;
+    /* M3 rework B: hold 중 메시지 전용 렌더는 카드 렌더를 건너뛰고 orderPending만 유지. */
+    if (!explicit && !state.agentsDirty && state.holdOrder) return;
+    var reorder = explicit || !state.holdOrder;
+    var seen = Object.create(null);
+    var i, a, el;
+    for (i = 0; i < list.length; i++) {
+      a = list[i];
+      seen[a.name] = true;
+      el = state.cardOf.get(a.name);
+      if (!el) {
+        el = buildAgentCard(a);
+        state.cardOf.set(a.name, el);
+      } else {
+        updateAgentCard(el, a);
       }
-      var glyph = document.createElement("span");
-      glyph.className = "sglyph sg-" + esc(a.status);
-      glyph.textContent = statusGlyph(a.status);
-      who.insertBefore(glyph, who.firstChild);
-      head.appendChild(who);
-      var st = document.createElement("span");
-      st.className = "st st-" + esc(a.status);
-      st.textContent = esc(a.status);
-      head.appendChild(st);
-      head.setAttribute("data-agent", esc(a.name));
-      wrap.appendChild(head);
-
-      /* 워크스페이스 경로. 홈은 ~ 로 줄인다. */
-      if (a.directory !== null && a.directory !== undefined && a.directory !== "") {
-        var dir = document.createElement("span");
-        dir.className = "dir";
-        dir.textContent = String(a.directory).replace(/^\/Users\/[^\/]+(?=\/|$)/, "~");
-        dir.title = String(a.directory);
-        wrap.appendChild(dir);
+      if (!el.parentNode) agentList.appendChild(el);
+    }
+    state.cardOf.forEach(function (node, nm) {
+      if (!seen[nm]) {
+        if (node.parentNode === agentList) agentList.removeChild(node);
+        state.cardOf.delete(nm);
       }
-
-      /* hcom이 description에 상태값을 그대로 내려(head 상태와 중복, 예: "listening")
-         오는 경우에는 그리지 않는다. 실제 설명문은 그대로 둔다. */
-      var descText = esc(a.description).trim();
-      if (descText !== "" && descText.toLowerCase() !== esc(a.status).trim().toLowerCase()) {
-        var desc = document.createElement("div");
-        desc.className = "desc";
-        desc.textContent = esc(a.description);
-        wrap.appendChild(desc);
-      }
-
-      var cur = document.createElement("span");
-      cur.className = "cur";
-      cur.setAttribute("data-oracle", "current-line");
-      cur.title = combineLine(a.statusContext, a.statusDetail);
-      cur.textContent = combineLine(a.statusContext, a.statusDetail);
-      wrap.appendChild(cur);
-
-      var hists = historyFor(a.name);
-      if (hists.length > 0) {
-        (function (nm, hs) {
-          var hw = document.createElement("div");
-          hw.className = "hwrap";
-          hw.setAttribute("data-histwrap", esc(nm));
-          var shown = Math.min(HIST_DEFAULT_N, hs.length);
-          for (var hi = 0; hi < shown; hi++) {
-            var hline = document.createElement("span");
-            hline.className = "hist";
-            hline.textContent = fmtTime(hs[hi].ts) + " " + activityLine(hs[hi]);
-            hw.appendChild(hline);
-          }
-          var moreBtn = document.createElement("button");
-          moreBtn.className = "hexpand";
-          moreBtn.setAttribute("aria-label", nm + " view full history");
-          moreBtn.title = nm + " view full history";
-          moreBtn.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h5v5M14 2L9 7M7 14H2V9M2 14l5-5"/></svg>';
-          moreBtn.addEventListener("click", function () { openHistModal(nm); });
-          hw.appendChild(moreBtn);
-          wrap.appendChild(hw);
-        })(a.name, hists);
-      }
-
-      agentList.appendChild(wrap);
     });
+    if (reorder) {
+      for (i = 0; i < list.length; i++) {
+        el = state.cardOf.get(list[i].name);
+        if (el) agentList.appendChild(el);
+      }
+      state.orderPending = false;
+    } else {
+      state.orderPending = true;
+    }
     /* FR-15: 5명 이상일 때만 하단 스크롤. 4명 이하에서는 max-height를 두지 않아
        O-2①(무스크롤)을 구조적으로 보장한다. UI 배치 #3: 인라인 스타일 대신
        tall 클래스 + 상수로만 토글한다. */
@@ -880,6 +1044,181 @@
     } else {
       agentList.classList.remove(AGENT_TALL_CLASS);
     }
+    state.agentsDirty = false;
+  }
+
+  function displayNameOf(a) {
+    var base = (a.tag !== null && a.tag !== undefined && a.tag !== "")
+      ? a.tag + "/" + a.name : esc(a.name);
+    return base + (a.unreadCount > 0 ? " (" + a.unreadCount + ")" : "");
+  }
+
+  /* M3-ui2: 핀 아이콘은 별(★/☆)이 아니라 압정 SVG. innerHTML에는 아래 정적
+     문자열만 넣는다(이름 포함 금지). 고정 = 채움, 해제 = 외곽선. */
+  var PIN_SVG_ON = '<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5.5" r="3.5"/><path d="M8 9v5" fill="none"/></svg>';
+  var PIN_SVG_OFF = '<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5.5" r="3.5"/><path d="M8 9v5"/></svg>';
+  function refreshPinBtn(btn, name) {
+    var on = !!state.pins[name];
+    btn.textContent = "";
+    btn.innerHTML = on ? PIN_SVG_ON : PIN_SVG_OFF;
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    btn.title = on ? name + " unpin" : name + " pin";
+  }
+
+  function buildAgentCard(a) {
+    var wrap = document.createElement("div");
+    wrap.className = "agent" + (a.status === "blocked" ? " blocked" : "");
+    wrap.setAttribute("data-agent", a.name);
+
+    var head = document.createElement("div");
+    head.className = "head";
+    var who = document.createElement("span");
+    who.className = "who";
+    var glyph = document.createElement("span");
+    glyph.className = "sglyph sg-" + esc(a.status);
+    glyph.textContent = statusGlyph(a.status);
+    who.appendChild(glyph);
+    var aname = document.createElement("span");
+    aname.className = "aname";
+    aname.textContent = displayNameOf(a);
+    who.appendChild(aname);
+    head.appendChild(who);
+    var hact = document.createElement("span");
+    hact.className = "hact";
+    var st = document.createElement("span");
+    st.className = "st st-" + esc(a.status);
+    st.textContent = esc(a.status);
+    hact.appendChild(st);
+    (function (nm) {
+      var pin = document.createElement("button");
+      pin.className = "pinbtn";
+      pin.setAttribute("aria-label", nm + " pin");
+      pin.addEventListener("click", function () { togglePin(nm); });
+      hact.appendChild(pin);
+      wrap._pin = pin;
+    })(a.name);
+    head.appendChild(hact);
+    head.setAttribute("data-agent", esc(a.name));
+    wrap.appendChild(head);
+    wrap._glyph = glyph;
+    wrap._aname = aname;
+    wrap._who = who;
+    wrap._st = st;
+    wrap._badge = null;
+
+    syncToolBadge(wrap, a);
+    syncDirDesc(wrap, a);
+
+    var cur = document.createElement("span");
+    cur.className = "cur";
+    cur.setAttribute("data-oracle", "current-line");
+    cur.title = combineLine(a.statusContext, a.statusDetail);
+    cur.textContent = combineLine(a.statusContext, a.statusDetail);
+    wrap.appendChild(cur);
+    wrap._cur = cur;
+
+    wrap._dir = wrap._dir || null;
+    wrap._desc = wrap._desc || null;
+    wrap._histKey = null;
+    wrap._hwrap = null;
+    syncHwrap(wrap, a);
+
+    refreshPinBtn(wrap._pin, a.name);
+    return wrap;
+  }
+
+  function syncToolBadge(wrap, a) {
+    var abbr = toolAbbr(a.tool);
+    if (abbr === null) {
+      if (wrap._badge && wrap._badge.parentNode === wrap._who) wrap._who.removeChild(wrap._badge);
+      wrap._badge = null;
+      return;
+    }
+    if (!wrap._badge) {
+      wrap._badge = document.createElement("span");
+      wrap._badge.className = "tool";
+      wrap._who.appendChild(wrap._badge);
+    }
+    wrap._badge.setAttribute("data-tool", esc(a.tool));
+    wrap._badge.textContent = abbr;
+    wrap._badge.title = esc(a.tool);
+  }
+
+  function syncDirDesc(wrap, a) {
+    /* 워크스페이스 경로. 홈은 ~ 로 줄인다. */
+    if (a.directory !== null && a.directory !== undefined && a.directory !== "") {
+      if (!wrap._dir) {
+        wrap._dir = document.createElement("span");
+        wrap._dir.className = "dir";
+        wrap.appendChild(wrap._dir);
+      }
+      wrap._dir.textContent = String(a.directory).replace(/^\/Users\/[^\/]+(?=\/|$)/, "~");
+      wrap._dir.title = String(a.directory);
+    } else if (wrap._dir && wrap._dir.parentNode === wrap) {
+      wrap.removeChild(wrap._dir);
+      wrap._dir = null;
+    }
+    /* hcom이 description에 상태값을 그대로 내려(head 상태와 중복, 예: "listening")
+       오는 경우에는 그리지 않는다. 실제 설명문은 그대로 둔다. */
+    var descText = esc(a.description).trim();
+    if (descText !== "" && descText.toLowerCase() !== esc(a.status).trim().toLowerCase()) {
+      if (!wrap._desc) {
+        wrap._desc = document.createElement("div");
+        wrap._desc.className = "desc";
+        wrap.appendChild(wrap._desc);
+      }
+      wrap._desc.textContent = esc(a.description);
+    } else if (wrap._desc && wrap._desc.parentNode === wrap) {
+      wrap.removeChild(wrap._desc);
+      wrap._desc = null;
+    }
+  }
+
+  /* 이력 영역. 바뀐 에이전트만 다시 만든다. N 상한은 HISTORY_N이 건다. */
+  function syncHwrap(wrap, a) {
+    var hs = historyFor(a.name);
+    var key = hs.map(function (h) { return h.ts + "\n" + h.label + "\n" + (h.detail || ""); }).join("\n-\n");
+    if (wrap._histKey === key) return;
+    wrap._histKey = key;
+    if (wrap._hwrap && wrap._hwrap.parentNode === wrap) wrap.removeChild(wrap._hwrap);
+    wrap._hwrap = null;
+    if (hs.length === 0) return;
+    (function (nm) {
+      var hw = document.createElement("div");
+      hw.className = "hwrap";
+      hw.setAttribute("data-histwrap", esc(nm));
+      var shown = Math.min(HIST_DEFAULT_N, hs.length);
+      for (var hi = 0; hi < shown; hi++) {
+        var hline = document.createElement("span");
+        hline.className = "hist";
+        hline.textContent = fmtTime(hs[hi].ts) + " " + activityLine(hs[hi]);
+        hw.appendChild(hline);
+      }
+      var moreBtn = document.createElement("button");
+      moreBtn.className = "hexpand";
+      moreBtn.setAttribute("aria-label", nm + " view full history");
+      moreBtn.title = nm + " view full history";
+      moreBtn.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h5v5M14 2L9 7M7 14H2V9M2 14l5-5"/></svg>';
+      moreBtn.addEventListener("click", function () { openHistModal(nm); });
+      hw.appendChild(moreBtn);
+      wrap.appendChild(hw);
+      wrap._hwrap = hw;
+    })(a.name);
+  }
+
+  function updateAgentCard(el, a) {
+    el.className = "agent" + (a.status === "blocked" ? " blocked" : "");
+    el._glyph.className = "sglyph sg-" + esc(a.status);
+    el._glyph.textContent = statusGlyph(a.status);
+    el._aname.textContent = displayNameOf(a);
+    syncToolBadge(el, a);
+    el._st.className = "st st-" + esc(a.status);
+    el._st.textContent = esc(a.status);
+    refreshPinBtn(el._pin, a.name);
+    syncDirDesc(el, a);
+    el._cur.title = combineLine(a.statusContext, a.statusDetail);
+    el._cur.textContent = combineLine(a.statusContext, a.statusDetail);
+    syncHwrap(el, a);
   }
 
   function renderTime() {
@@ -916,7 +1255,7 @@
     timeList.hidden = isLog;
     tabLogBtn.setAttribute("aria-pressed", isLog ? "true" : "false");
     tabTimeBtn.setAttribute("aria-pressed", isLog ? "false" : "true");
-    renderAgents();
+    renderAgents(false);
   }
   function renderTimeOnce() {
     if (state.view === "time") renderTime();
@@ -961,6 +1300,10 @@
   });
   document.addEventListener("keydown", function (ev) {
     if (ev.key === "Escape" && !histModal.hidden) closeHistModal();
+    else if (ev.key === "Escape" && isSettingsOpen()) {
+      setSettingsOpen(false);
+      agentSettings.focus();
+    }
   });
 
   function setView(v) {
@@ -969,10 +1312,124 @@
     try { window.localStorage.setItem(VIEW_KEY, v); } catch (e) { /* 무시 */ }
     applyView();
     renderTimeOnce();
+    /* M3: Timeline에 있는 동안 쌓인 측정 큐는 Log 복귀 시 처리한다. */
+    flushMeasure();
   }
 
   tabLogBtn.addEventListener("click", function () { setView("log"); });
   tabTimeBtn.addEventListener("click", function () { setView("time"); });
+
+  /* --- M3: 핀·정렬·간략 보기 --- */
+
+  /* 핀 토글 시 msgList 전체(hidden 행 포함)의 [data-who]를 순회해 클래스만
+     토글. 메시지 재생성 금지, _msg/expanded/_measured 보존. */
+  function retogglePinned() {
+    var spans = msgList.querySelectorAll("[data-who]");
+    for (var i = 0; i < spans.length; i++) {
+      var on = !!state.pins[spans[i].getAttribute("data-who")];
+      if (on) spans[i].classList.add("pinned");
+      else spans[i].classList.remove("pinned");
+    }
+  }
+
+  /* Clear pins는 핀이 1개 이상일 때만 노출. */
+  function updateClearPins() {
+    var n = Object.keys(state.pins).length;
+    clearPins.hidden = n === 0;
+  }
+
+  function refreshAllPinBtns() {
+    state.cardOf.forEach(function (node, nm) {
+      if (node._pin) refreshPinBtn(node._pin, nm);
+    });
+    updateClearPins();
+  }
+
+  function togglePin(name) {
+    if (state.pins[name]) delete state.pins[name];
+    else state.pins[name] = true;
+    savePins();
+    refreshAllPinBtns();
+    retogglePinned();
+    /* 명시 조작은 보류 중에도 즉시 재정렬. */
+    renderAgents(true);
+    if (stickToBottom) msgPane.scrollTop = msgPane.scrollHeight;
+  }
+
+  clearPins.addEventListener("click", function () {
+    state.pins = Object.create(null);
+    savePins();
+    refreshAllPinBtns();
+    retogglePinned();
+    renderAgents(true);
+    if (stickToBottom) msgPane.scrollTop = msgPane.scrollHeight;
+  });
+
+  function setSort(on) {
+    state.sortOn = on;
+    try { window.localStorage.setItem(SORT_KEY, on ? "1" : "0"); } catch (e) { /* 무시 */ }
+    sortToggle.setAttribute("aria-pressed", on ? "true" : "false");
+    renderAgents(true);
+  }
+  sortToggle.addEventListener("click", function () { setSort(!state.sortOn); });
+
+  function setCompact(on) {
+    state.compact = on;
+    try { window.localStorage.setItem(COMPACT_KEY, on ? "1" : "0"); } catch (e) { /* 무시 */ }
+    if (on) document.body.classList.add("compact");
+    else document.body.classList.remove("compact");
+    compactToggle.setAttribute("aria-pressed", on ? "true" : "false");
+  }
+  compactToggle.addEventListener("click", function () { setCompact(!state.compact); });
+
+  /* M3-ui3: 헤더 설정 버블. 버블 안 토글을 눌러도 버블은 열린 채 유지한다.
+     닫힘: 설정 버튼 재클릭·버블 밖 클릭·Esc. Esc로 닫으면 포커스를 되돌린다.
+     버블은 #agentHeader 안에 있어 #agentList hold(pointer/focus) 판정에 닿지 않는다. */
+  function isSettingsOpen() { return !agentSettingsPop.hidden; }
+  function setSettingsOpen(open) {
+    agentSettingsPop.hidden = !open;
+    agentSettings.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+  agentSettings.addEventListener("click", function () { setSettingsOpen(!isSettingsOpen()); });
+  document.addEventListener("click", function (ev) {
+    if (agentSettingsPop.hidden) return;
+    var t = ev ? ev.target : null;
+    if (t && (agentSettings.contains(t) || agentSettingsPop.contains(t))) return;
+    setSettingsOpen(false);
+  });
+
+  /* 자동 재정렬만 보류. 핀·필터·정렬 토글 같은 명시 조작은 renderAgents(true)로
+     즉시 간다. 보류 해제 시 최신 state로 1회 재정렬. */
+  function releaseHold() {
+    if (state.orderPending) {
+      state.orderPending = false;
+      renderAgents(true);
+    }
+  }
+  /* M3 rework A: pointer/focus 독립 추적. holdOrder = pointerInside || focusInside.
+     둘 다 false일 때만 releaseHold. */
+  function syncHold() {
+    state.holdOrder = !!(state.pointerInside || state.focusInside);
+    if (!state.holdOrder) releaseHold();
+  }
+  agentList.addEventListener("mouseenter", function () {
+    state.pointerInside = true;
+    state.holdOrder = true;
+  });
+  agentList.addEventListener("mouseleave", function () {
+    state.pointerInside = false;
+    syncHold();
+  });
+  agentList.addEventListener("focusin", function () {
+    state.focusInside = true;
+    state.holdOrder = true;
+  });
+  agentList.addEventListener("focusout", function (ev) {
+    var to = ev.relatedTarget;
+    if (to && agentList.contains(to)) return;
+    state.focusInside = false;
+    syncHold();
+  });
 
   /* 메시지: 최신이 아래, 자동 스크롤(맨 아래 근처일 때만 따라감). */
   var msgPane = $("msgPane");
@@ -981,14 +1438,36 @@
     stickToBottom = (msgPane.scrollHeight - msgPane.scrollTop - msgPane.clientHeight) < 24;
   });
 
+  /* M3: 발신인·각 수신인을 개별 span(dataset.who)으로 만든다.
+     이름은 createElement + textContent로만 넣는다. esc()는 HTML 이스케이프가
+     아니라서 innerHTML에 이름을 넣으면 P6(XSS)이 뚫린다.
+     `@`·쉼표·화살표는 별도 텍스트 노드. 신규 메시지는 append 시점 핀을 바로 입힌다. */
+  function whoSpan(name) {
+    var s = document.createElement("span");
+    s.setAttribute("data-who", name);
+    s.textContent = name;
+    if (state.pins[name]) s.classList.add("pinned");
+    return s;
+  }
+
   function appendMessage(m) {
     var wrap = document.createElement("div");
     wrap.className = "msg";
     var meta = document.createElement("div");
     meta.className = "meta";
-    var to = (m.to && m.to.length) ? " → @" + m.to.join(",@") : " → (all)";
-    var from = document.createTextNode("● " + m.from + to + "  ");
-    meta.appendChild(from);
+    meta.appendChild(document.createTextNode("● "));
+    meta.appendChild(whoSpan(m.from));
+    meta.appendChild(document.createTextNode(" → "));
+    if (m.to && m.to.length) {
+      for (var ti = 0; ti < m.to.length; ti++) {
+        if (ti > 0) meta.appendChild(document.createTextNode(","));
+        meta.appendChild(document.createTextNode("@"));
+        meta.appendChild(whoSpan(m.to[ti]));
+      }
+    } else {
+      meta.appendChild(document.createTextNode("(all)"));
+    }
+    meta.appendChild(document.createTextNode("  "));
     if (m.intent) {
       var chip = document.createElement("span");
       chip.className = "intent";
@@ -1024,6 +1503,9 @@
 
   var pendingMeasure = [];
   function flushMeasure() {
+    /* M3: msgList가 hidden(Timeline 탭)일 때는 측정하지 않고 큐에 남긴다.
+       Log 탭 복귀(setView) 시 측정한다. */
+    if (msgList.hidden) return;
     if (pendingMeasure.length === 0) return;
     var batch = pendingMeasure;
     pendingMeasure = [];
@@ -1091,6 +1573,23 @@
       state.wsOf.set(a.name, a.workspace);
       if (a.workspaceLabel) state.wsLabel.set(a.workspace, a.workspaceLabel);
     });
+    /* M3: snapshot에서 사라진 이름의 핀도 지운다. */
+    (function () {
+      var aliveNow = Object.create(null);
+      state.agents.forEach(function (a) { aliveNow[a.name] = true; });
+      var pruned = false, nm;
+      for (nm in state.pins) {
+        if (Object.prototype.hasOwnProperty.call(state.pins, nm) && !aliveNow[nm]) {
+          delete state.pins[nm];
+          pruned = true;
+        }
+      }
+      if (pruned) {
+        savePins();
+        retogglePinned();
+      }
+    })();
+    state.agentsDirty = true;
     renderWsOptions();
     applyMsgFilter();
     scheduleRender();
@@ -1111,6 +1610,8 @@
       kind: ev.kind, label: ev.label, detail: ev.detail
     });
     while (state.activities.length > BUFFER_MAX) state.activities.shift();
+    /* M3: 이력은 카드 이력 영역에 보이므로 카드도 더티. 메시지만 올 때는 서지 않는다. */
+    state.agentsDirty = true;
     scheduleRender();
   }
 
@@ -1154,6 +1655,11 @@
     var params = new URLSearchParams(window.location.search);
     var fixturePath = params.get("fixture");
     var forceSample = params.get("sample") === "1";
+
+    /* M3: 저장된 토글 상태를 헤더·본문에 반영. */
+    sortToggle.setAttribute("aria-pressed", state.sortOn ? "true" : "false");
+    compactToggle.setAttribute("aria-pressed", state.compact ? "true" : "false");
+    if (state.compact) document.body.classList.add("compact");
 
     fetch("/version")
       .then(function (res) { return res.json(); })
